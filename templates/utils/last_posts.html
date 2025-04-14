@@ -1,0 +1,37 @@
+{% if posts %}
+<div class="last-posts-container">
+    <div class="last-posts">
+        {% for post in posts %}
+        <div class="last-post">
+            <div class="last_post_info">
+                <a href="/{{ post.get('board') }}/">/{{ post.get('board') }}/</a>
+            </div>
+
+            <!-- Оборачиваем изображение в ссылку -->
+            <div class="last_post_image">
+                <a href="/{{ post.get('board') }}/thread/{{post.get('post_id')}}" style="display: block;"> <!-- Ссылка на тред -->
+
+                 {% if not ('.mp4' in post.post_image or '.webm' in post.post_image or '.mp3' in post.post_image) %}
+                 <img draggable="false"
+                      class="post_img"
+                      src="{{ url_for('static', filename='/post_images/thumbs/thumb_' + post.post_image) }}"
+                      alt="Изображение к посту {{ post.get('post_id') }}"> <!-- Убрали href, добавили alt -->
+
+                 {% elif ('.mp4' in post.post_image or '.webm' in post.post_image or '.mp3' in post.post_image) %}
+                 <img draggable="false"
+                      class="post_img"
+                      src="{{ url_for('static', filename='/post_images/thumbs/thumb_' + post.post_image.split('.')[0] + '.jpg' ) }}"
+                      alt="Превью медиа к посту {{ post.get('post_id') }}"> <!-- Убрали href, добавили alt -->
+                 {% endif %}
+
+                </a> <!-- Закрываем тег ссылки -->
+            </div>
+
+            <div class="last_post_content">
+                <a href="/{{ post.get('board') }}/thread/{{post.get('post_id')}}">{{ post.get('post_content')[:150] }}...</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

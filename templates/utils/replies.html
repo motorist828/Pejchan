@@ -1,0 +1,65 @@
+<div class="posts" id="posts_board">
+    {% for post in posts %}
+    <div class="divisoria"></div>
+    <div class="post" post-role="operator" id="{{ post.post_id }}">
+        <div class="postInfo">
+            <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" form="banDeleteForm">
+            <span class="nameBlock"><span class="name">{% if post.post_user == '' or post.post_user == 'Anonymous' %}ドワーフ{% else %}{{ post.post_user | safe }}{% endif %}</span></span>
+            <span class="postDate">{{ post.post_date }}</span>
+			<a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No. </a>
+			<a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ post.post_id }}">{{ post.post_id }}</a>
+			{% include 'utils/thread-moderation-options.html' %}
+        </div>
+        <div class="post_content_container">
+            <div class="post_image">
+                <div class="post_image_info">
+			<a class="image_url" href="/static/post_images/{{ post.get('post_image') }}">
+ 			 {{ post.get('post_image') }}
+		    </a>
+                </div>
+                 {% if not ('.mp4' in post.post_image or '.webm' in post.post_image or '.mp3' in post.post_image) %}  
+				<img draggable="false" class="post_img"  href="{{ url_for('static', filename='/post_images/' + post.post_image) }}" src="{{ url_for('static', filename='/post_images/thumbs/thumb_' + post.post_image) }}" alt="">
+					{% elif ('.mp4' in post.post_image or '.webm' in post.post_image or '.mp3' in post.post_image) %}
+			    <img draggable="false" class="post_img" href="{{ url_for('static', filename='/post_images/' + post.post_image) }}"      src="{{ url_for('static', filename='/post_images/thumbs/thumb_' + post.post_image.split('.')[0] + '.jpg' ) }}" alt="">
+			    {% endif %}
+            </div>
+            <div class="post_content">
+                <pre>{{ post.post_content | safe }}</pre>
+            </div>
+            <div class="replies">
+                {% for reply in replies %}
+                <div class="reply" id="{{ reply.reply_id }}">
+                    <div class="reply-postInfo">
+                        <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" name="{{ post.post_id }}" form="banDeleteForm">
+                        <span class="nameBlock"><span class="name">{% if not reply.post_user or reply.post_user == '' %}ドワーフ{% else %}{{ reply.post_user | safe }}{% endif %}</span> </span>
+                        <span class="postDate">{{ reply.post_date }}</span>
+						<a href="/{{ board_id }}/thread/{{ reply.reply_id }}" class="postLink">No. </a>
+						<a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ reply.reply_id }}">{{ reply.reply_id }}</a>
+						{% include 'utils/reply-moderation-options.html' %}
+                    </div>
+                    <div class="post_content_container">
+                        {% if reply.image != '' %}
+                        <div class="reply_image">
+                            <div class="reply_image_info">
+                                <a class="image_url" href="/static/reply_images/{{ reply.get('image') }}" title="{{ reply.get('image') }}">
+    				{{ reply.get('image') }}
+					</a>
+                         </div>
+                            {% if not ('.mp4' in reply.image or '.webm' in reply.image or '.mp3' in reply.image) %}  
+						<img draggable="false" class="reply_img"  href="{{ url_for('static', filename='/reply_images/' + reply.image) }}"    src="{{ url_for('static', filename='/reply_images/thumbs/thumb_' + reply.image) }}" alt="">
+							{% elif ('.mp4' in reply.image or '.webm' in reply.image or '.mp3' in reply.image) %}
+						<img draggable="false" class="reply_img" href="{{ url_for('static', filename='/reply_images/' + reply.image) }}"     src="{{ url_for('static', filename='/reply_images/thumbs/thumb_' + reply.image.split('.')[0] + '.jpg' ) }}" alt="">
+							{% endif %}
+                        </div>
+                        {% endif %}
+                        <div class="reply_content">
+                            <pre>{{ reply.content | safe }}</pre>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
