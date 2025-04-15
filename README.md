@@ -28,7 +28,7 @@ pip install -r requirements.txt
 
 ## How to use
 ```bash
-python3 app.py or python3 app.py depending on your OS
+ python3 app.py or python app.py depending on your OS
 `The first account will automatically get OWNER permissions. 
  Use a long enough password when registering.
  You can change the name in the templates\index.html file. Line #21
