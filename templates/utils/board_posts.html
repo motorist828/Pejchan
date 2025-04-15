@@ -16,7 +16,8 @@
         <div class="post_content_container">
             <div class="post_image">
                 <div class="post_image_info">
-                    <a class="image_url" href="/static/post_images/{{ post.get('post_image') }}">{{ post.get('post_image')[:17] + '.' + post.get('post_image').split('.')[-1] }}</a>
+                    <a class="image_url" href="/static/post_images/{{ post.get('post_image') }}">
+					{{ post.get('post_image') }}</a>
                 </div>
                  {% if not ('.mp4' in post.post_image or '.webm' in post.post_image or '.mp3' in post.post_image) %}  
 				<img draggable="false" class="post_img"  href="{{ url_for('static', filename='/post_images/' + post.post_image) }}" src="{{ url_for('static', filename='/post_images/thumbs/thumb_' + post.post_image) }}" alt="">
@@ -46,7 +47,8 @@
                         {% if reply.image != '' %}
                         <div class="reply_image">
                             <div class="reply_image_info">
-                                <a class="image_url" href="/static/reply_images/{{ reply.get('image') }}">{{ reply.get('image')[:17] + '.' + reply.get('image').split('.')[-1] }}</a>
+                                <a class="image_url" href="/static/reply_images/{{ reply.get('image') }}" title="{{ reply.get('image') }}">
+								{{ reply.get('image') }}</a>
                             </div>
 								{% if not ('.mp4' in reply.image or '.webm' in reply.image or '.mp3' in reply.image) %}  
 							<img draggable="false" class="reply_img"  href="{{ url_for('static', filename='/reply_images/' + reply.image) }}"    src="{{ url_for('static', filename='/reply_images/thumbs/thumb_' + reply.image) }}" alt="">
