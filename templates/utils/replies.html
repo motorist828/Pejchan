@@ -63,3 +63,19 @@
     </div>
     {% endfor %}
 </div>
+
+<script>
+  // Сохраняем позицию прокрутки перед обновлением
+  window.addEventListener('beforeunload', () => {
+    sessionStorage.setItem('scrollPosition', window.scrollY);
+  });
+
+  // Восстанавливаем позицию после загрузки страницы
+  window.addEventListener('load', () => {
+    const scrollPosition = sessionStorage.getItem('scrollPosition');
+    if (scrollPosition) {
+      window.scrollTo(0, parseInt(scrollPosition));
+      sessionStorage.removeItem('scrollPosition'); // Очищаем, если не нужно больше
+    }
+  });
+</script>

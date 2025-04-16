@@ -12,6 +12,98 @@
   --cor-fundo-gradiente: linear-gradient(#6d99BA50, #1c1c1c75 400px calc(100% - 200px), #d2738A90);
 }
 
+
+
+.upload-list {
+    margin-top: 2px;
+    border: 1px dashed #ccc;
+    padding: 10px;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+    display: none;
+	max-width: 350px;
+}
+
+.upload-item {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    margin-bottom: 5px;
+    background-color: #fff;
+    border: 1px solid #eee;
+    border-radius: 3px;
+}
+
+.file-icon {
+    margin-right: 8px;
+}
+
+.filename {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+	color: #2a324a;
+}
+
+.filesize {
+    color: #666;
+    font-size: 0.9em;
+    margin: 0 10px;
+}
+
+.remove-file {
+    cursor: pointer;
+    color: #c00;
+    font-weight: bold;
+    padding: 0 5px;
+}
+
+.remove-file:hover {
+    color: #f00;
+}
+
+.filelabel {
+    cursor: pointer;
+    display: inline-block;
+    padding: 6px 12px;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.filelabel:hover {
+    background-color: #e0e0e0;
+}
+
+.file-notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 15px;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 4px;
+    z-index: 10000;
+    animation: fadeInOut 2s ease-in-out;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(10px); }
+    10% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(10px); }
+}
+
+
+
+
+
+
+
+
+
 body {
   font-family: Graphik-Medium, "Graphik-Regular", "Gotham SSm A", "Gotham SSm B", "Helvetica Neue", Helvetica, Arial, sans-serif;
   background-color: var(--cor-fundo);
@@ -376,7 +468,7 @@ footer a {
   width: 9em;
   height: 3.3em;
   text-align: center;
-  margin-top: 3em;
+  margin-top: 2em;
   color: var(--cor-secundaria);
   display: block;
 }
@@ -493,7 +585,7 @@ input[type=button], input[type=file], input[type=number], input[type=password], 
   flex-grow: 1;
   flex-direction: column;
   min-height: 38px;
-  height: 100%;
+  height: 30%;
   font-size: 13px;
   color: var(--cor-terciaria);
 }
@@ -630,6 +722,7 @@ input[type=button], input[type=file], input[type=number], input[type=password], 
   margin: 1px;
   overflow-wrap: anywhere;
   z-index: 1;
+  padding: 0em 0.5em 0em;
   
 }
 
@@ -800,7 +893,7 @@ input[type=button], input[type=file], input[type=number], input[type=password], 
 .reply_content {
   flex: 1;
   margin-bottom: 1.3em;
-  padding: 0em 2em 0em;
+  padding: 0em 1em 0em;
   font-family: "Spline Sans Mono", monospace !important;
   font-size: 10pt !important;
   color: var(--cor-terciaria);

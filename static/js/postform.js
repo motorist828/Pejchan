@@ -8,7 +8,134 @@ document.addEventListener('DOMContentLoaded', () => {
     const header = draggableForm.querySelector('.new-thread-header');
     const closeButton = draggableForm.querySelector('.close.postform-style');
     const messageTextarea = draggableForm.querySelector('textarea');
-    let isDragging = false; // Флаг для отслеживания состояния перетаскивания
+    const fileInput = draggableForm.querySelector('input[type="file"]');
+    const uploadList = draggableForm.querySelector('.upload-list');
+    let isDragging = false;
+
+    // Функция для обновления списка файлов
+    function updateFileList() {
+        if (!fileInput || !uploadList) return;
+
+        uploadList.innerHTML = '';
+
+        if (fileInput.files.length === 0) {
+            uploadList.style.display = 'none';
+            return;
+        }
+
+        uploadList.style.display = 'block';
+
+        for (let i = 0; i < fileInput.files.length; i++) {
+            const file = fileInput.files[i];
+            const fileElement = document.createElement('div');
+            fileElement.className = 'upload-item';
+            fileElement.innerHTML = `
+                <span class="file-icon">📄</span>
+                <span class="filename">${file.name}</span>
+                <span class="filesize">(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                <span class="remove-file" data-index="${i}" title="Remove file">×</span>
+            `;
+            uploadList.appendChild(fileElement);
+        }
+
+        const removeButtons = uploadList.querySelectorAll('.remove-file');
+        removeButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                const index = parseInt(button.getAttribute('data-index'));
+                removeFile(index);
+            });
+        });
+    }
+
+    function removeFile(index) {
+        if (!fileInput) return;
+
+        const dataTransfer = new DataTransfer();
+        for (let i = 0; i < fileInput.files.length; i++) {
+            if (i !== index) {
+                dataTransfer.items.add(fileInput.files[i]);
+            }
+        }
+        fileInput.files = dataTransfer.files;
+        updateFileList();
+    }
+
+    // Обработчик вставки файлов
+    if (messageTextarea) {
+        messageTextarea.addEventListener('paste', async (event) => {
+            const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+            let filePasted = false;
+            
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.kind === 'file') {
+                    const file = item.getAsFile();
+                    if (file && fileInput) {
+                        filePasted = true;
+                        const dataTransfer = new DataTransfer();
+                        
+                        for (let j = 0; j < fileInput.files.length; j++) {
+                            dataTransfer.items.add(fileInput.files[j]);
+                        }
+                        
+                        dataTransfer.items.add(file);
+                        fileInput.files = dataTransfer.files;
+                        updateFileList();
+                    }
+                }
+            }
+            
+            if (filePasted) {
+                event.preventDefault();
+                // Показываем уведомление о добавлении файла
+                const notification = document.createElement('div');
+                notification.className = 'file-notification';
+                notification.textContent = 'File added from clipboard';
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 2000);
+            }
+        });
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener('change', updateFileList);
+        
+        // Drag and drop для файлов
+        const fileLabel = draggableForm.querySelector('.filelabel');
+        if (fileLabel) {
+            fileLabel.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileLabel.style.backgroundColor = '#e0e0e0';
+            });
+            
+            fileLabel.addEventListener('dragleave', () => {
+                fileLabel.style.backgroundColor = '#f0f0f0';
+            });
+            
+            fileLabel.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileLabel.style.backgroundColor = '#f0f0f0';
+                
+                if (e.dataTransfer.files.length > 0) {
+                    const dataTransfer = new DataTransfer();
+                    
+                    // Добавляем существующие файлы
+                    for (let i = 0; i < fileInput.files.length; i++) {
+                        dataTransfer.items.add(fileInput.files[i]);
+                    }
+                    
+                    // Добавляем новые файлы
+                    for (let i = 0; i < e.dataTransfer.files.length; i++) {
+                        dataTransfer.items.add(e.dataTransfer.files[i]);
+                    }
+                    
+                    fileInput.files = dataTransfer.files;
+                    updateFileList();
+                }
+            });
+        }
+    }
 
     function openDraggableForm(event, postId = null) {
         if (event) {
@@ -62,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         newTop = Math.max(0, Math.min(newTop, bottomEdge)) -50;
 
         draggableForm.style.left = newLeft + 'px';
-        draggableForm.style.top = newTop + 'px' ;
+        draggableForm.style.top = newTop + 'px';
 
         if (elementToFocus) {
             setTimeout(() => {
@@ -87,11 +214,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (messageTextarea) {
             messageTextarea.value = '';
         }
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        if (uploadList) {
+            uploadList.innerHTML = '';
+            uploadList.style.display = 'none';
+        }
         draggableForm.style.display = 'none';
     }
 
     document.addEventListener('click', function(event) {
-        // Если происходит перетаскивание, игнорируем клик
         if (isDragging) {
             isDragging = false;
             return;
@@ -110,7 +243,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeDraggableForm();
             }
         } else if (!isFormClick) {
-            // Закрываем форму только если клик был вне формы
             closeDraggableForm();
         }
     });
@@ -123,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
         header.addEventListener('mousedown', function(e) {
             if (window.getComputedStyle(draggableForm).display === 'none') return;
 
-            isDragging = true; // Устанавливаем флаг перетаскивания
+            isDragging = true;
             e.stopPropagation();
             e.preventDefault();
 
@@ -167,7 +299,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.removeEventListener('mouseup', onMouseUp);
                 draggableForm.style.zIndex = originalZIndex;
                 draggableForm.ondragstart = null;
-                // Не сбрасываем isDragging здесь, чтобы клик после перетаскивания не закрывал форму
                 setTimeout(() => { isDragging = false; }, 100);
             }
 
@@ -177,4 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
             draggableForm.ondragstart = () => false;
         });
     }
+
+    // Инициализация списка файлов при загрузке
+    updateFileList();
 });
