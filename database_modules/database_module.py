@@ -608,7 +608,7 @@ def remove_post(post_id):
         delete_media_files(post.get('post_images', []), './static/post_images/')
         
         # Delete post thumbnails
-        delete_media_files(post.get('imagesthb', []), './static/reply_images/')
+        delete_media_files(post.get('imagesthb', []), './static/post_images/')
         
         # Remove post from database
         DB.delete('posts', post_id)
