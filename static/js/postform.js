@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (event.target.files.length > 0) {
                 addFilePreviews(event.target.files);
             }
-            event.target.value = null;
+            //event.target.value = null;
         });
     } else {
          const fileSectionLabel = draggableForm.querySelector('.row .label span:contains("Files")')?.closest('.label');
