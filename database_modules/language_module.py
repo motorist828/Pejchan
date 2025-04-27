@@ -10,7 +10,7 @@ def load_langs():
 
 def save_new_lang(lang):
     with open('./config/languages.json', 'w') as f:
-        json.dump(lang, f, indent=5)
+        json.dump(lang, f, indent=4)
 
 def change_general_language(new_lang):
     languages = load_langs()
@@ -32,4 +32,4 @@ def get_user_lang(user_lang):
         return langs["default"][0]
 
 if __name__ == '__main__':
-    print('dont open this file alone.')
+    print("This module should not be run directly.")

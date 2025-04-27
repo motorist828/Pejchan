@@ -1,31 +1,40 @@
 <div class="boards-container">
     <div class="tabuas">
         <table class="boards-table">
+            {# Существующая логика подсчета постов #}
             {% set post_counts = {} %}
             {% for post in all_posts %}
                 {% set board_uri = post.get('board') %}
-                {% if board_uri in post_counts %}
-                    {% set post_counts = post_counts.update({board_uri: post_counts[board_uri] + 1}) %}
-                {% else %}
-                    {% set post_counts = post_counts.update({board_uri: 1}) %}
+                {# Добавлена проверка, что board_uri существует, чтобы избежать ошибок #}
+                {% if board_uri %}
+                    {% if board_uri in post_counts %}
+                        {% set post_counts = post_counts.update({board_uri: post_counts[board_uri] + 1}) %}
+                    {% else %}
+                        {% set post_counts = post_counts.update({board_uri: 1}) %}
+                    {% endif %}
                 {% endif %}
             {% endfor %}
+
             <thead>
                 <tr>
-                    <th>{{ lang["board-list-boardname"] }}</th>
-                    <th>{{ lang["board-list-boarddesc"] }}</th>
-                    <th>{{ lang["board-list-posts"] }}</th>
+                    {# Используем lang.get с запасным вариантом на случай отсутствия ключа перевода #}
+                    <th>{{ lang.get("board-list-boardname", "Board") }}</th>
+                    <th>{{ lang.get("board-list-boarddesc", "Description") }}</th>
+                    <th>{{ lang.get("board-list-posts", "Posts") }}</th>
+                    <th>{{ lang.get("board-list-replay", "Replay") }}</th>
                 </tr>
             </thead>
-            {% for board in boards %}
+            {# Исправлено: tbody должен быть снаружи цикла для корректной структуры таблицы #}
             <tbody>
+                {% for board in boards %}
                 <tr>
                     <td><a class="board_link" href="/{{ board.get('board_uri') }}">/{{ board.get('board_uri') }}/</a></td>
                     <td>{{ board.get('board_desc') }}</td>
-                    <td>{{ post_counts.get(board.get('board_uri'), 0) }}</td>
+                    <td>{{ post_counts.get(board.get('board_uri'), 0) }}</td> {# Используем .get для безопасности #}
+                    <td>{{ reply_counts.get(board.get('board_uri'), 0) }}</td> {# <-- Новая ячейка с количеством ответов #}
                 </tr>
+                {% endfor %}
             </tbody>
-            {% endfor %}
         </table>
     </div>
 </div>

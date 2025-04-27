@@ -1,6 +1,91 @@
+<style>
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); /* Полупрозрачный фон */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* Поверх остального контента */
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px 30px;
+    border-radius: 5px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    min-width: 400px; /* Или другая ширина */
+    color: #333; /* Цвет текста для модального окна */
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #111;
+}
+
+#custom-css-input {
+    width: 100%;
+    box-sizing: border-box; /* Учитывать padding и border в ширине */
+    margin-bottom: 15px;
+    font-family: monospace; /* Моноширинный шрифт для CSS */
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+
+.modal-buttons {
+    text-align: right;
+}
+
+.modal-buttons button {
+    margin-left: 10px;
+    padding: 8px 15px;
+    cursor: pointer;
+}
+
+#save-custom-css {
+    background-color: #4CAF50; /* Зеленый */
+    color: white;
+    border: none;
+}
+
+#cancel-custom-css {
+    background-color: #f44336; /* Красный */
+    color: white;
+    border: none;
+}
+</style>
+
 <select id="theme-selector">
-    <option value="">{{ lang["theme-selector"] }}</option>
-    <option value="none">default</option>
-    <option value="/static/css/dogola.css">dogolachan</option>
-    <option value="/static/css/dogola2024.css">dogola2024</option>
+    {# Первая опция - невыбираемый плейсхолдер #}
+    <option value="" disabled selected>{{ lang["theme-selector"] }}</option>
+
+    {# Опция для темы по умолчанию (без динамической темы) #}
+    <option value="none">default</option> {# Или {{ lang["default_theme"] }} если переводите #}
+
+    {# Цикл для добавления предопределенных тем из бэкенда #}
+    {% for theme in custom_themes %}
+    <option value="/static/css/custom/{{ theme.theme_file }}">{{ theme.theme_name }}</option>
+    {% endfor %}
+
+    {# Новая опция для пользовательского CSS #}
+    <option value="custom">Свой CSS</option> {# Или {{ lang["custom_css_option"] }} если переводите #}
 </select>
+
+{# --- Важно! --- #}
+{# Не забудьте также добавить HTML-код для модального окна #}
+{# (div#custom-css-modal и его содержимое) где-то на этой же странице #}
+{# Например: #}
+<div id="custom-css-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <h3>Введите свой CSS</h3> {# Или {{ lang["custom_css_modal_title"] }} #}
+        <textarea id="custom-css-input" rows="15" cols="60" placeholder=".my-element { color: red; }"></textarea>
+        <div class="modal-buttons">
+            <button id="save-custom-css">Применить и сохранить</button> {# Или {{ lang["apply_and_save_button"] }} #}
+            <button id="cancel-custom-css">Отмена</button> {# Или {{ lang["cancel_button"] }} #}
+        </div>
+    </div>
+</div>

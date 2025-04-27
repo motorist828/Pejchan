@@ -4,48 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {% for post in posts %}
-    <meta property="og:title" content="/{{post.board}}/{{post.post_id}}">
-    <meta property="og:image" content="{{ url_for('static', filename='/post_images/thumbs/' + post.post_image) }}">
-    <meta property="og:description" content="{{ post.post_content[:33] }}...">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <title>ｒｃｈａｎ - /{{post.board}}/</title>
+    <title>Pejchan - /{{post.board}}/</title>
     {% endfor %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+	
 
-    <style>
-        .scroll-btn {
-            position: fixed;
-            right: 20px;
-            width: 50px;
-            height: 50px;
-            background-color: #252A38;
-            color: white;
-            border: none;
-            border-radius: 20%;
-            cursor: pointer;
-            font-size: 20px;
-            z-index: 99;
-        }
-        
-        #scroll-up {
-            bottom: 80px;
-        }
-        
-        #scroll-down {
-            bottom: 20px;
-        }
-    </style>
+	
 </head>
 <body>
     {% include 'utils/navbar.html' %}
     <div class="page-content">
-        {% include 'utils/threadform.html' %}
-        {% include 'utils/thread-options-container.html' %}
+	
+	    {% include 'utils/thread-options-container.html' %}
+        {% include 'utils/threadform.html' %}   
         {% include 'utils/replies.html' %}
-	{% include 'utils/threadform.html' %}
         {% include 'utils/waring-container.html' %}
+		{% include 'utils/threadform.html' %}
+		<br><br>
     </div>
     <div id="reinrun"></div>
     {% include 'utils/footer.html' %}
@@ -57,11 +35,11 @@
     <script src="/static/js/thread.js"></script>
     <script src="/static/js/socket.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-
+	
 	    <!-- Кнопки прокрутки -->
     <button class="scroll-btn" id="scroll-up" title="Вверх">↑</button>
     <button class="scroll-btn" id="scroll-down" title="Вниз">↓</button>
-
+    
     <script>
         document.getElementById('scroll-up').addEventListener('click', function() {
             window.scrollTo({ top: 0, behavior: 'smooth' });

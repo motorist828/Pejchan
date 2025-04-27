@@ -1,3 +1,111 @@
+    <style>
+        /* Стили для скрытия оригинального инпута */
+        #file {
+            position: absolute;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            height: 1px;
+            width: 1px;
+            margin: -1px;
+            padding: 0;
+            border: 0;
+        }
+
+        /* Стили для контейнера превью */
+        .upload-list {
+            margin-top: 5px; /* Отступ сверху */
+            max-height: 150px; /* Ограничение высоты, чтобы не растягивать форму */
+            overflow-y: auto; /* Прокрутка, если файлов много */
+            border: 0px dashed #ccc; /* Небольшая рамка для обозначения */
+            padding: 0px;
+            min-height: 0px; /* Минимальная высота, чтобы контейнер был виден */
+            background-color: #fff;
+        }
+
+        /* Стили для каждого элемента превью */
+        .file-preview {
+            display: flex;
+            align-items: center;
+            border: 1px solid #eee;
+            padding: 2px;
+            margin-bottom: 2px;
+            font-size: 0.9em;
+            background-color: #f9f9f9;
+            border-radius: 3px;
+        }
+        .file-preview img {
+            max-width: 40px; /* Макс. ширина миниатюры */
+            max-height: 40px; /* Макс. высота миниатюры */
+            margin-right: 10px;
+            object-fit: cover; /* Масштабирование с сохранением пропорций */
+            flex-shrink: 0; /* Запретить сжатие картинки */
+        }
+        .file-preview-info {
+            flex-grow: 1; /* Занимает доступное пространство */
+            overflow: hidden; /* Скрывает текст, выходящий за пределы */
+            text-overflow: ellipsis; /* Многоточие для длинных имен */
+            white-space: nowrap; /* Запрещает перенос строки */
+            margin-right: 5px; /* Небольшой отступ справа */
+        }
+        .file-preview-name {
+            display: block;
+            font-weight: bold;
+        }
+        .file-preview-size {
+            display: block;
+            color: #666;
+            font-size: 0.8em;
+        }
+        .file-remove-btn {
+            background: none;
+            border: none;
+            color: red;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.2em;
+            padding: 0 5px;
+            margin-left: auto; /* Прижимает кнопку вправо */
+            flex-shrink: 0; /* Запретить сжатие кнопки */
+        }
+
+
+        .row {         
+            margin-bottom: 0px;
+            align-items: flex-start; /* Выравнивание по верху */
+        }
+
+        .required {
+            color: red;
+            margin-left: 2px;
+        }
+    
+         
+           .sending-spinner {
+            display: inline-block; /* Чтобы был в строке с кнопкой */
+            width: 50px;           /* Размер спиннера */
+            height: 50px;
+            border: 5px solid rgb(0 0 0 / 40%); /* Светлый круг */
+            border-radius: 50%;
+            border-top-color: #007bff; /* Цвет вращающейся части (подбери под свой дизайн) */
+            animation: spin 1s linear infinite; /* Анимация вращения */
+            margin-left: 10px;   /* Отступ от кнопки */
+            vertical-align: middle; /* Выравнивание по центру строки */
+            margin-top: -80px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+
+
+
+        /* Атрибут bis_skin_checked="1" добавляется расширениями браузера, его можно игнорировать */
+
+    </style>
+
 <div id="togglePostFormLink" bis_skin_checked="1"><a href="#draggableForm">{% if post_mode == 'reply' %}[{{ lang["thread-reply-button"] }}]{% else %}[{{ lang["thread-form-button"] }}]{% endif %}</a></div>
 
 <div class="newboard-form" id="draggableForm">
@@ -24,12 +132,19 @@
                     id="text" name="text" rows="5" minlength="0" maxlength="10000"></textarea>
             </section>
             <section class="row">
-                <div class="label" bis_skin_checked="1"><span>Files<span class="required">*</span></span>
-                    <small>Max 5 files</small><small>10MB total</small>
-                </div><span class="col"><label class="jsonly postform-style filelabel" for="file"> Select/Drop/Paste
-                        files</label><input id="file" type="file" name="fileInput" multiple=""
-                        style="position: absolute; border: none; height: 1px; width: 1px;">
+                <div class="label" bis_skin_checked="1">
+                    <span>Files<span class="required">*</span></span>
+                    <small>Max 4 files</small>
+                    <small>Total 20Mb</small>
+                </div>
+                <span class="col"> <!-- Контейнер для элементов справа от метки -->
+                    <!-- Метка, стилизованная под кнопку, для выбора файлов -->
+                    <label class="jsonly postform-style filelabel" for="file"> Select/Drag and Drop Files</label>
+                    <!-- Настоящий input файла, скрытый -->
+                    <input id="file" type="file" name="fileInput" multiple="">
+                    <!-- Контейнер, куда будут добавляться превью файлов -->
                     <div class="upload-list" data-spoilers="true" data-strip-filenames="true" bis_skin_checked="1">
+                        <!-- Превью файлов появятся здесь -->
                     </div>
                 </span>
             </section>
@@ -49,7 +164,14 @@
             </div>
             {% endif %}
             {% endif %}
-            <input id="submitpost" type="submit" value="{{ lang['thread-form-button'] }}">
+            <div style="text-align: center;"> {# Контейнер для выравнивания кнопки и спиннера справа #}
+                <input id="submitpost" type="submit"
+                       value="{% if post_mode == 'reply' %}New Reply{% else %}{{ lang['thread-form-button'] }}{% endif %}"
+                       data-original-value="{% if post_mode == 'reply' %}New Reply{% else %}{{ lang['thread-form-button'] }}{% endif %}">
+
+                {# <<< ДОБАВЛЕНО: Элемент для спиннера >>> #}
+                <span class="sending-spinner" id="sendingIndicator" style="display: none;"></span>
+            </div>
         </div>
     </form>
 </div>

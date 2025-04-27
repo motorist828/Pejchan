@@ -6,24 +6,25 @@
     <div class="post" post-role="operator" id="{{ post.post_id }}">
         <div class="postInfo">
             <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" name="65004" form="banDeleteForm">
-            <span class="nameBlock"><span class="name">{% if post.post_user == '' or post.post_user == 'Anonymous' %}ドワーフ{% else %}{{ post.post_user | safe }} {% endif %}</span></span>
-            <span class="postDate">{{ post.post_date }}</span>
-			<a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No. </a>
-			<a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ post.post_id }}">{{ post.post_id }}</a>
-			{% include 'utils/thread-moderation-options.html' %}
-                <a class="postLink" href="/{{ board_id }}/thread/{{ post.post_id }}"> [{{ lang['thread-reply-button'] }}]</a>{% include 'utils/thread-moderation-options.html' %}
+            &nbsp;<span class="nameBlock"><span class="name">{% if post.post_user == '' or post.post_user == 'Anonymous' %}Anon{% else %}{{ post.post_user | safe }} {% endif %}</span></span>&nbsp;
+            <span class="postDate">{{ post.post_date }}</span>&nbsp;<a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No.</a> <a class="postLink" href="/{{ board_id }}/thread/{{ post.post_id }}" class="postNumber">{{ post.post_id }}</a>
+                <a class="postLink" href="/{{ board_id }}/thread/{{ post.post_id }}">&nbsp; [{{ lang['thread-reply-button'] }}]</a>{% include 'utils/thread-moderation-options.html' %}
         </div>
         <div class="post_content_container">
-            <div class="post_image">
-                <div class="post_image_info">
-                    <a class="image_url" href="/static/post_images/{{ post.get('post_image') }}">
-					{{ post.get('post_image') }}</a>
-                </div>
-                 {% if not ('.mp4' in post.post_image or '.webm' in post.post_image or '.mp3' in post.post_image) %}  
-				<img draggable="false" class="post_img"  href="{{ url_for('static', filename='/post_images/' + post.post_image) }}" src="{{ url_for('static', filename='/post_images/thumbs/thumb_' + post.post_image) }}" alt="">
-					{% elif ('.mp4' in post.post_image or '.webm' in post.post_image or '.mp3' in post.post_image) %}
-			    <img draggable="false" class="post_img" href="{{ url_for('static', filename='/post_images/' + post.post_image) }}"      src="{{ url_for('static', filename='/post_images/thumbs/thumb_' + post.post_image.split('.')[0] + '.jpg' ) }}" alt="">
-			    {% endif %}
+            <div class="post_files {% if post.post_images|length > 1 %}multiple_files{% endif %}">
+                {% for image in post.post_images %}
+                    <div class="post_image">
+                        <div class="post_image_info">
+                            <a class="image_url" href="/static/post_images/{{ image }}">
+                                {{ image }}
+                            </a>
+                        </div>
+                        <img draggable="false" class="post_img" 
+                                src="{{ url_for('static', filename='post_images/' ~ post.imagesthb[loop.index0]) }}"
+								href="/static/post_images/{{ image }}"
+                                alt="">
+                    </div>
+                {% endfor %}
             </div>
             <div class="post_content">
                 <pre>{% if post.post_content | length >= 500 %}{{ post.post_content[:450] | safe }}...<a class="toolong" href="/{{ board_id }}/thread/{{ post.post_id }}">Ver mais.</a>{% else %}{{ post.post_content | safe }}{% endif %}</pre>
@@ -37,25 +38,34 @@
                 <div class="reply" id="{{ reply.reply_id }}">
                     <div class="reply-postInfo">
                         <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" name="{{ post.post_id }}" form="banDeleteForm">
-                        <span class="nameBlock"><span class="name">{% if not reply.post_user or reply.post_user == '' %}ドワーフ{% else %}{{ reply.post_user | safe }}{% endif %}</span></span>
-                        <span class="postDate">{{ reply.post_date }}</span>
-						<a href="/{{ board_id }}/thread/{{ reply.reply_id }}" class="postLink">No. </a>
-						<a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ reply.reply_id }}">{{ reply.reply_id }}</a>
-						{% include 'utils/reply-moderation-options.html' %}
+                        <span class="nameBlock"><span class="name">{% if not reply.post_user or reply.post_user == '' %}Anon{% else %}{{ reply.post_user | safe }}{% endif %}</span></span>
+                        <span class="postDate">{{ reply.post_date }}</span>&nbsp;<a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No.</a> <a class="postLink" href="/{{ board_id }}/thread/{{ post.post_id }}" >{{ reply.reply_id }}</a>{% include 'utils/reply-moderation-options.html' %}
                     </div>
                     <div class="post_content_container">
-                        {% if reply.image != '' %}
-                        <div class="reply_image">
-                            <div class="reply_image_info">
-                                <a class="image_url" href="/static/reply_images/{{ reply.get('image') }}" title="{{ reply.get('image') }}">
-								{{ reply.get('image') }}</a>
+                        {% if reply.get('images') or reply.get('image') %}
+                            <div class="reply_files {% if reply.get('images') and reply.images|length > 1 %}multiple_files{% endif %}">
+                                {% for image in reply.get('images', [reply.get('image', '')]) %}
+                                
+								{% set thb_image = reply.imagesthb if (reply.imagesthb is string) else (reply.imagesthb[loop.index0] if (reply.imagesthb and loop.index0 < reply.imagesthb|length) else image) %}
+                                <div class="reply_image">
+                                        {% if image %}
+                                            <div class="reply_file">
+                                                <div class="reply_image_info">
+                                                    <a class="image_url" href="/static/reply_images/{{ image }}">
+                                                        {{ image }}
+                                                    </a>
+                                                </div>
+                                            
+                                                    <img draggable="false" class="reply_img" 
+                                                        src="{{ url_for('static', filename='reply_images/' ~ thb_image) }}"
+														href="/static/reply_images/{{ image }}"
+                                                        alt="">
+                                                
+                                            </div>
+                                        {% endif %}
+                                </div>
+                                {% endfor %}
                             </div>
-								{% if not ('.mp4' in reply.image or '.webm' in reply.image or '.mp3' in reply.image) %}  
-							<img draggable="false" class="reply_img"  href="{{ url_for('static', filename='/reply_images/' + reply.image) }}"    src="{{ url_for('static', filename='/reply_images/thumbs/thumb_' + reply.image) }}" alt="">
-								{% elif ('.mp4' in reply.image or '.webm' in reply.image or '.mp3' in reply.image) %}
-							<img draggable="false" class="reply_img" href="{{ url_for('static', filename='/reply_images/' + reply.image) }}"     src="{{ url_for('static', filename='/reply_images/thumbs/thumb_' + reply.image.split('.')[0] + '.jpg' ) }}" alt="">
-								{% endif %}
-                        </div>
                         {% endif %}
                         <div class="reply_content">
                             <pre>{{ reply.content | safe }}</pre>

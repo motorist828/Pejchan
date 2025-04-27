@@ -1,30 +1,26 @@
-# imports
-from flask import current_app, Blueprint, render_template, redirect, request, flash, session
-from database_modules import database_module, timeout_module, formatting
+from flask import current_app, Blueprint, render_template, redirect, request, flash, session, url_for
+from database_modules import database_module, moderation_module, formatting
 from flask_socketio import SocketIO, emit
-from PIL import Image
+from datetime import datetime, timedelta
+from PIL import Image, UnidentifiedImageError # Добавлен UnidentifiedImageError для обработки ошибок Pillow
 import cv2
 import re
 import os
-import shutil
-import time  # Добавлен импорт модуля времени
+import time # Добавлен для Unix timestamp
+import shutil # Добавлен для копирования MP3 плейсхолдера
 
-# bluepint register.
+# Blueprint register
 posts_bp = Blueprint('posts', __name__)
-# socketIO call.
 socketio = SocketIO()
 
-THUMBNAIL_SIZE = (250, 250)  # Размер миниатюры
-AUDIO_THUMBNAIL = 'play.jpg'  # Шаблон для аудио миниатюр
-ALLOWED_EXTENSIONS = {'.jpeg', '.jpg', '.gif', '.png', '.webp', '.webm', '.mp4', '.mov', '.mp3'} # Допустимые расширения файлов
+# --- Constants ---
+THUMB_SIZE = (250, 250)
+# Относительный путь к плейсхолдеру MP3 (относительно static)
+MP3_THUMB_REL_PATH = 'play.jpg'
+# Абсолютный путь к плейсхолдеру MP3
+MP3_THUMB_ABS_PATH = os.path.join('static', MP3_THUMB_REL_PATH)
+ALLOWED_EXTENSIONS = {'.jpeg', '.jpg', '.mov', '.gif', '.png', '.webp', '.webm', '.mp4', '.mp3'} # Добавлен .mp3
 
-def generate_unix_filename(original_filename):
-    """Генерирует имя файла на основе Unix-времени с сохранением расширения"""
-    unix_time = int(time.time())
-    _, ext = os.path.splitext(original_filename)
-    return f"{unix_time}{ext.lower()}"
-
-# post handling class.
 class PostHandler:
     def __init__(self, socketio, user_ip, post_mode, post_name, board_id, comment, embed, captcha_input):
         self.socketio = socketio
@@ -32,366 +28,435 @@ class PostHandler:
         self.post_mode = post_mode
         self.post_name = post_name
         self.board_id = board_id
-        # Форматируем комментарий сразу, но будем проверять его на пустоту позже, если нужно
-        self.raw_comment = comment # Сохраняем исходный комментарий для проверки на пустоту
+        self.original_content = comment
         self.comment = formatting.format_comment(comment)
         self.embed = embed
         self.captcha_input = captcha_input
 
+    timeout_manager = moderation_module.TimeoutManager()
+    ban_manager = moderation_module.BanManager()
+
+    def check_banned(self):
+        banned_status = self.ban_manager.is_banned(self.user_ip)
+        if banned_status.get('is_banned', True):
+            flash(f"You has been banned, reason: {banned_status.get('reason')}")
+            return False
+        return True
+
     def check_timeout(self):
-        """Проверяет, не находится ли пользователь в таймауте"""
-        if database_module.check_timeout_user(self.user_ip):
-            flash('Подождите несколько секунд перед повторной отправкой.')
+        timeout_status = self.timeout_manager.check_timeout(self.user_ip)
+        if timeout_status.get('is_timeout', False):
+            flash('Wait a few seconds to post again.')
             return False
         return True
 
-    def check_board(self):
-        """Проверяет существование доски"""
-        if not database_module.check_board(self.board_id):
-            flash('Доска не существует.')
+    def validate_comment(self):
+        if len(self.comment) >= 20000:
+            flash('You reached the limit.')
             return False
+        # Пустой комментарий теперь разрешен, если есть файл
+        # if self.comment == '':
+        #     flash('You have to type something, you bastard.')
+        #     return False
         return True
 
-    def validate_comment_length(self):
-        """Валидация длины комментария"""
-        if len(self.comment) >= 10000:
-            flash('Превышен лимит символов.')
-            return False
-        return True
-
-    def create_image_thumbnail(self, image_path, filename):
-        """Создает миниатюру для изображения"""
+    def generate_thumbnail(self, original_path, thumb_path, file_ext):
+        """Генерирует миниатюру для разных типов файлов."""
         try:
-            thumb_folder = os.path.join(os.path.dirname(image_path), 'thumbs')
-            os.makedirs(thumb_folder, exist_ok=True)
-
-            thumb_path = os.path.join(thumb_folder, f"thumb_{filename}")
-
-            with Image.open(image_path) as img:
-                if filename.lower().endswith('.gif'):
-                    try:
-                        img.seek(0)
-                        frame = img.copy()
-                        frame.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-                        if frame.mode not in ('P', 'L'):
-                            frame = frame.convert('P', palette=Image.ADAPTIVE)
-                        frame.save(
-                            thumb_path,
-                            format='GIF',
-                            optimize=True,
-                            transparency=0 if img.info.get('transparency') is not None else None
-                        )
-                    except EOFError:
-                        img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-                        img.save(thumb_path)
-                else:
-                    img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-                    if img.mode in ('RGBA', 'P'):
+            if file_ext in ['.jpeg', '.jpg', '.png', '.webp']:
+                with Image.open(original_path) as img:
+                    img.thumbnail(THUMB_SIZE, Image.Resampling.LANCZOS)
+                    # Сохраняем в JPG для унификации (кроме PNG с прозрачностью)
+                    save_format = 'JPEG'
+                    if img.mode == 'RGBA' and file_ext == '.png':
+                        save_format = 'PNG'
+                        img.save(thumb_path, format=save_format)
+                    elif img.mode == 'P' and 'transparency' in img.info: # Handle indexed transparency (like some GIFs/PNGs)
+                         img = img.convert('RGBA')
+                         img.save(thumb_path, format='PNG')
+                    else:
                         img = img.convert('RGB')
-                    img.save(thumb_path)
-
-            return thumb_path
+                        img.save(thumb_path, format=save_format, quality=85)
+                return True
+            elif file_ext == '.gif':
+                with Image.open(original_path) as img:
+                    # Берем первый кадр
+                    img.seek(0)
+                    # Создаем копию кадра для изменения размера
+                    frame = img.copy()
+                    frame.thumbnail(THUMB_SIZE, Image.Resampling.LANCZOS)
+                    # Сохраняем как GIF (первый кадр)
+                    frame.save(thumb_path, format='GIF')
+                return True
+            elif file_ext in ['.mp4', '.mov', '.webm']:
+                return self.capture_frame_from_video(original_path, thumb_path)
+            elif file_ext == '.mp3':
+                 # Проверяем наличие плейсхолдера
+                if not os.path.exists(MP3_THUMB_ABS_PATH):
+                    print(f"Warning: MP3 thumbnail placeholder not found at {MP3_THUMB_ABS_PATH}")
+                    return False # Не можем создать миниатюру без плейсхолдера
+                # Копируем плейсхолдер как миниатюру
+                shutil.copy2(MP3_THUMB_ABS_PATH, thumb_path)
+                return True
+        except UnidentifiedImageError:
+            print(f"Error: Cannot identify image file {original_path}. It might be corrupted or unsupported.")
+            return False
+        except cv2.error as e:
+             print(f"Error processing video {original_path} with OpenCV: {e}")
+             return False
         except Exception as e:
-            print(f"Error creating image thumbnail: {e}")
-            return None
+            print(f"Error generating thumbnail for {original_path}: {e}")
+            return False
+        return False
 
-    def create_audio_thumbnail(self, audio_path, filename):
-        """Создает миниатюру для аудио файла"""
-        try:
-            thumb_folder = os.path.join(os.path.dirname(audio_path), 'thumbs')
-            os.makedirs(thumb_folder, exist_ok=True)
+    def process_uploaded_files(self, upload_folder, is_thread=False):
+        """Обрабатывает загруженные файлы, сохраняет их с Unix timestamp именем и создает миниатюры."""
+        files = request.files.getlist('fileInput')
+        processed_files_info = [] # Список словарей {'original': filename, 'thumbnail': thumb_filename}
 
-            template_path = os.path.join(current_app.static_folder, AUDIO_THUMBNAIL)
+        # Определяем папки для оригиналов и миниатюр
+        base_upload_folder = './static/post_images/' if is_thread else './static/reply_images/'
+        thumb_folder_abs = os.path.join(base_upload_folder, 'thumbs/')
+        original_folder_abs = base_upload_folder
 
-            if not os.path.exists(template_path):
-                print(f"Audio thumbnail template not found at {template_path}")
-                return None
+        os.makedirs(thumb_folder_abs, exist_ok=True)
+        os.makedirs(original_folder_abs, exist_ok=True)
 
-            base_name = os.path.splitext(filename)[0]
-            thumb_filename = f"thumb_{base_name}.jpg"
-            thumb_path = os.path.join(thumb_folder, thumb_filename)
+        for file in files:
+            if file.filename == '':
+                continue
 
-            shutil.copy2(template_path, thumb_path)
+            original_filename_unsafe = file.filename
+            _, file_ext = os.path.splitext(original_filename_unsafe)
+            file_ext = file_ext.lower() # Приводим расширение к нижнему регистру
 
-            return thumb_path
-        except Exception as e:
-            print(f"Error creating audio thumbnail: {e}")
-            return None
+            if file_ext not in ALLOWED_EXTENSIONS:
+                flash(f"File type {file_ext} is not allowed.")
+                continue # Пропускаем недопустимые файлы
 
-    def capture_frame_from_video(self, video_path):
-        """Создает миниатюру из видео"""
+            # Генерируем уникальное имя файла на основе Unix timestamp
+            timestamp = int(time.time() * 1000) # мс для большей уникальности
+            new_filename_base = str(timestamp)
+            new_filename = f"{new_filename_base}{file_ext}"
+            counter = 0
+            # Обработка очень редких коллизий timestamp
+            while os.path.exists(os.path.join(original_folder_abs, new_filename)):
+                counter += 1
+                new_filename_base = f"{timestamp}_{counter}"
+                new_filename = f"{new_filename_base}{file_ext}"
+
+            original_save_path = os.path.join(original_folder_abs, new_filename)
+
+            try:
+                # Сохраняем оригинальный файл
+                file.save(original_save_path)
+
+                # --- Создание миниатюры ---
+                thumb_filename = "" # Имя файла миниатюры
+                thumb_save_path = ""  # Полный путь для сохранения миниатюры
+
+                if file_ext == '.mp3':
+                     # Для MP3 миниатюра - это плейсхолдер, имя миниатюры соответствует оригиналу + .jpg
+                     thumb_filename_base = new_filename_base
+                     thumb_ext = '.jpg' # Миниатюра будет JPG
+                     thumb_filename = f"thumb_{thumb_filename_base}{thumb_ext}"
+                     thumb_save_path = os.path.join(thumb_folder_abs, thumb_filename)
+                elif file_ext == '.gif':
+                    # Для GIF миниатюра тоже GIF
+                    thumb_filename_base = new_filename_base
+                    thumb_ext = '.gif'
+                    thumb_filename = f"thumb_{thumb_filename_base}{thumb_ext}"
+                    thumb_save_path = os.path.join(thumb_folder_abs, thumb_filename)
+                else:
+                     # Для остальных - JPG миниатюра
+                    thumb_filename_base = new_filename_base
+                    thumb_ext = '.jpg'
+                    thumb_filename = f"thumb_{thumb_filename_base}{thumb_ext}"
+                    thumb_save_path = os.path.join(thumb_folder_abs, thumb_filename)
+
+
+                if self.generate_thumbnail(original_save_path, thumb_save_path, file_ext):
+                    # Получаем относительный путь к миниатюре для сохранения в БД/HTML
+                    thumb_relative_path = os.path.join(os.path.basename(os.path.dirname(thumb_folder_abs)), thumb_filename).replace('\\', '/')
+
+                    processed_files_info.append({
+                        'original': new_filename, # Сохраняем новое имя оригинала
+                        'thumbnail': thumb_relative_path # Сохраняем относительный путь к миниатюре
+                    })
+                else:
+                    # Если миниатюра не создалась, удаляем оригинал (или можно оставить без миниатюры)
+                    print(f"Failed to create thumbnail for {new_filename}. Removing original.")
+                    os.remove(original_save_path)
+                    flash(f"Could not process file {original_filename_unsafe}.")
+
+
+            except Exception as e:
+                print(f"Error saving or processing file {original_filename_unsafe}: {e}")
+                flash(f"Error processing file {original_filename_unsafe}.")
+                # Попытаться удалить частично сохраненный файл, если он есть
+                if os.path.exists(original_save_path):
+                    os.remove(original_save_path)
+
+        # Проверка, если комментарий пуст, но файлы есть
+        if not self.comment and not processed_files_info:
+             flash('You have to type something or upload a file.')
+             return None # Возвращаем None при ошибке валидации
+
+        return processed_files_info # Возвращаем список информации о файлах
+
+    def handle_reply(self, reply_to):
+        if not database_module.check_replyto_exist(int(reply_to)):
+            flash("This thread don't even exist, dumb!")
+            return False
+
+        if database_module.verify_locked_thread(int(reply_to)):
+            flash("This thread is locked.")
+            return False
+
+        if database_module.verify_board_captcha(self.board_id):
+            if not database_module.validate_captcha(self.captcha_input, session["captcha_text"]):
+                flash("Invalid captcha.")
+                return False
+
+        upload_folder = './static/reply_images/' # Базовая папка для ответов
+        processed_files = self.process_uploaded_files(upload_folder, is_thread=False)
+
+        # Проверяем результат process_uploaded_files (может быть None при ошибке)
+        if processed_files is None:
+             # Сообщение об ошибке уже установлено в process_uploaded_files
+             return False
+
+        # Проверка: нужен либо текст, либо файл
+        if not self.comment and not processed_files:
+            flash("You need to type something or upload a file for a reply.")
+            return False
+
+        # --- Обновление для SocketIO и Базы Данных ---
+        # Извлекаем только оригинальные имена для обратной совместимости или если фронтенд ожидает строки
+        original_filenames = [f['original'] for f in processed_files]
+        # Создаем данные для сокета с информацией о миниатюрах
+        socket_files_data = [{'original': f['original'], 'thumbnail': url_for('static', filename=os.path.join(os.path.basename(upload_folder), 'thumbs', os.path.basename(f['thumbnail']))).replace('\\','/')} for f in processed_files]
+        filethumb = [f"thumbs/{os.path.basename(f['thumbnail'])}" for f in processed_files]
+        fileorig = [f"{os.path.basename(f['original'])}" for f in processed_files]
+        
+        self.socketio.emit('nova_postagem', {
+            'type': 'New Reply',
+            'post': {
+                'id': database_module.get_max_post_id() + 1,
+                'thread_id': reply_to,
+                'name': self.post_name,
+                'content': self.comment,
+                # Отправляем данные с миниатюрами для реалтайм обновления
+                
+                # Можно оставить и старый формат для совместимости, если где-то используется
+                'filesthb': filethumb,
+                'files': fileorig,
+                'date': datetime.now().strftime('%d/%m/%Y %H:%M:%S'),
+                'board': self.board_id
+            }
+        }, broadcast=True)
+
+        # Передаем всю структуру processed_files в базу данных
+        database_module.add_new_reply(self.user_ip, reply_to, self.post_name, self.comment, self.embed, fileorig, filethumb)
+        self.timeout_manager.apply_timeout(self.user_ip, duration_seconds=35, reason="Automatic timeout.")
+        return True
+
+    def capture_frame_from_video(self, video_path, thumb_path):
+        """Захватывает кадр из видео и сохраняет как миниатюру JPG."""
+        cap = None # Инициализируем до try
         try:
             cap = cv2.VideoCapture(video_path)
             if not cap.isOpened():
                 raise ValueError("Error: Unable to open video.")
 
+            # Попробуем взять кадр на 1-й секунде, если не выйдет - первый кадр
             fps = cap.get(cv2.CAP_PROP_FPS)
-            # Пытаемся взять кадр на 1-й секунде, или самый первый, если видео короче
-            frame_number = int(fps) if fps > 0 else 0
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            target_frame_index = int(fps) if fps and fps > 0 and frame_count > fps else 0
 
+            cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame_index)
             ret, frame = cap.read()
             if not ret:
-                 # Если не удалось прочитать на 1й секунде, пробуем 0й кадр
-                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                 ret, frame = cap.read()
-                 if not ret:
-                    raise ValueError("Error: Unable to read frame from video.")
+                # Если не удалось на 1 сек, берем самый первый
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+                if not ret:
+                    raise ValueError("Error: Unable to read any frame.")
 
+            # Конвертируем BGR (OpenCV) в RGB (Pillow)
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(rgb_frame)
 
-            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # Создаем миниатюру
+            pil_image.thumbnail(THUMB_SIZE, Image.Resampling.LANCZOS)
 
-            thumb_folder = os.path.join(os.path.dirname(video_path), 'thumbs')
-            os.makedirs(thumb_folder, exist_ok=True)
+            # Сохраняем как JPG
+            pil_image.save(thumb_path, format='JPEG', quality=85)
+            return True # Успешно
 
-            base, ext = os.path.splitext(os.path.basename(video_path))
-            thumbnail_filename = f"thumb_{base}.jpg"
-            thumb_path = os.path.join(thumb_folder, thumbnail_filename)
-
-            pil_image = Image.fromarray(image)
-            pil_image.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-            pil_image.save(thumb_path)
-
-            cap.release()
-
-            return thumb_path
-
-        except Exception as e:
-            print(f"Error processing video for thumbnail: {e}")
-            return None
-
-    def handle_reply(self, reply_to):
-        """Обработка ответа в треде"""
-        # --- Общие проверки ---
-        if database_module.verify_locked_thread(int(reply_to)):
-            flash("Тред закрыт.")
-            return False
-        if database_module.verify_board_captcha(self.board_id):
-            if not database_module.validate_captcha(self.captcha_input, session.get("captcha_text")): # Используем .get для безопасности
-                flash("Неверная капча.")
-                return False
-        if not self.validate_comment_length(): # Проверяем только длину, не пустоту
+        except cv2.error as e:
+             print(f"OpenCV error processing video {video_path}: {e}")
              return False
-
-        # --- Обработка файла ---
-        file_uploaded = False
-        new_filename = ""
-        file = request.files.get('fileInput') # Используем .get для безопасности
-
-        if file and file.filename != '':
-            _, ext = os.path.splitext(file.filename)
-            if ext.lower() in ALLOWED_EXTENSIONS:
-                upload_folder = './static/reply_images/'
-                os.makedirs(upload_folder, exist_ok=True)
-
-                new_filename = generate_unix_filename(file.filename)
-                file_path = os.path.join(upload_folder, new_filename)
-                file.save(file_path)
-
-                thumb_created = False
-                if new_filename.lower().endswith(('.jpeg', '.jpg', '.gif', '.png', '.webp')):
-                    thumb_created = self.create_image_thumbnail(file_path, new_filename) is not None
-                elif new_filename.lower().endswith(('.mov', '.webm', '.mp4')):
-                    thumb_created = self.capture_frame_from_video(file_path) is not None
-                elif new_filename.lower().endswith('.mp3'):
-                    thumb_created = self.create_audio_thumbnail(file_path, new_filename) is not None
-
-                if not thumb_created:
-                    flash("Ошибка создания миниатюры для файла.")
-                    # Попытаемся удалить загруженный файл, если миниатюру создать не удалось
-                    try:
-                        os.remove(file_path)
-                    except OSError as e:
-                        print(f"Error deleting file after thumbnail failure: {e}")
-                    return False # Ошибка при создании миниатюры
-
-                file_uploaded = True # Файл успешно загружен и обработан
-            else:
-                flash("Недопустимый тип файла.")
-                return False # Неверный тип файла
-
-        # --- Проверка наличия контента (текст или файл) ---
-        has_content = file_uploaded or self.raw_comment.strip()
-
-        if not has_content:
-            flash("Для ответа необходимо ввести текст или прикрепить файл.")
+        except Exception as e:
+            print(f"Error capturing frame from video {video_path}: {e}")
             return False
-
-        # --- Добавление ответа в базу данных ---
-        # Используем new_filename если файл был загружен, иначе пустую строку
-        db_filename = new_filename if file_uploaded else ""
-        database_module.add_new_reply(self.user_ip, reply_to, self.post_name, self.comment, self.embed, db_filename)
-        self.socketio.emit('nova_postagem', {'type': 'reply', 'thread_id': reply_to}, broadcast=True) # Уточняем тип события
-        timeout_module.timeout(self.user_ip)
-        return True
-
+        finally:
+            if cap:
+                cap.release() # Обязательно освобождаем ресурс
 
     def handle_post(self):
-        """Обработка нового поста (логика не меняется)"""
-        # --- Общие проверки ---
         if database_module.verify_board_captcha(self.board_id):
-            if not database_module.validate_captcha(self.captcha_input, session.get("captcha_text")):
-                flash("Неверная капча.")
+            if not database_module.validate_captcha(self.captcha_input, session["captcha_text"]):
+                flash("Invalid captcha.")
                 return False
-        # Для поста ВАЖНО проверить и длину, и НЕПУСТОТУ комментария
-        if not self.validate_comment_length():
-            return False
-        if not self.raw_comment.strip(): # Проверка на пустой или состоящий из пробелов комментарий
-             flash("Комментарий не может быть пустым для нового поста.")
+
+        upload_folder = './static/post_images/' # Базовая папка для постов
+        processed_files = self.process_uploaded_files(upload_folder, is_thread=True)
+
+        # Проверяем результат process_uploaded_files
+        if processed_files is None:
              return False
 
-        # --- Обработка файла (обязателен для поста) ---
-        file = request.files.get('fileInput')
-
-        if not file or file.filename == '':
-             flash("Для создания нового поста необходимо прикрепить файл.")
-             return False
-
-        _, ext = os.path.splitext(file.filename)
-        if ext.lower() not in ALLOWED_EXTENSIONS:
-            flash("Недопустимый тип файла.")
+        # Для нового треда нужен хотя бы один файл
+        if not processed_files:
+            flash("You need to upload at least one file to start a thread.")
             return False
 
-        upload_folder = './static/post_images/'
-        os.makedirs(upload_folder, exist_ok=True)
+        # Проверка: нужен либо текст, либо файл (хотя для треда файл обязателен)
+        if not self.comment and not processed_files:
+            # Эта проверка избыточна из-за предыдущей, но оставим для ясности
+            flash("You need to type something or upload a file.")
+            return False
 
-        new_filename = generate_unix_filename(file.filename)
-        file_path = os.path.join(upload_folder, new_filename)
-        file.save(file_path)
+        # --- Обновление для SocketIO и Базы Данных ---
+        original_filenames = [f['original'] for f in processed_files]
+        
+        socket_files_data = [{'original': f['original'], 'thumbnail': url_for('static', filename=os.path.join(os.path.basename(upload_folder), 'thumbs', os.path.basename(f['thumbnail']))).replace('\\','/')} for f in processed_files]
+        filethumb = [f"thumbs/{os.path.basename(f['thumbnail'])}" for f in processed_files]
+        fileorig = [f"{os.path.basename(f['original'])}" for f in processed_files]
 
-        thumb_created = False
-        thumb_path = None # Инициализируем переменную для пути к миниатюре
 
-        if new_filename.lower().endswith(('.jpeg', '.jpg', '.gif', '.png', '.webp')):
-            thumb_path = self.create_image_thumbnail(file_path, new_filename)
-            thumb_created = thumb_path is not None
-        elif new_filename.lower().endswith(('.mp4', '.mov', '.webm')):
-            thumb_path = self.capture_frame_from_video(file_path)
-            thumb_created = thumb_path is not None
-        elif new_filename.lower().endswith('.mp3'):
-            thumb_path = self.create_audio_thumbnail(file_path, new_filename)
-            thumb_created = thumb_path is not None
+        self.socketio.emit('nova_postagem', {
+            'type': 'New Thread',
+            'post': {
+                'id': database_module.get_max_post_id() + 1,
+                'name': self.post_name,
+                'content': self.comment,
+                # Отправляем данные с миниатюрами
+                
+                'filesthb': filethumb,
+                'files': fileorig,
+                'date': datetime.now().strftime('%d/%m/%Y %H:%M:%S'),
+                'board': self.board_id,
+                'role': 'user' # or whatever role system you have
+            }
+        }, broadcast=True)
 
-        if not thumb_created:
-            flash("Ошибка создания миниатюры для файла поста.")
-             # Попытаемся удалить загруженный файл, если миниатюру создать не удалось
-            try:
-                os.remove(file_path)
-                if thumb_path and os.path.exists(thumb_path): # Удаляем и миниатюру, если она создалась частично
-                     os.remove(thumb_path)
-            except OSError as e:
-                print(f"Error deleting file/thumb after post thumbnail failure: {e}")
-            return False # Ошибка при создании миниатюры
-
-        # --- Добавление поста в базу данных ---
-        database_module.add_new_post(self.user_ip, self.board_id, self.post_name, self.comment, self.embed, new_filename)
-        self.socketio.emit('nova_postagem', {'type': 'post', 'board_id': self.board_id}, broadcast=True) # Уточняем тип события
-        timeout_module.timeout(self.user_ip)
+        # Передаем всю структуру processed_files в базу данных
+        database_module.add_new_post(self.user_ip, self.board_id, self.post_name,
+                                   self.original_content, self.comment, self.embed, fileorig, filethumb)
+        self.timeout_manager.apply_timeout(self.user_ip, duration_seconds=35, reason="Automatic timeout.")
         return True
 
-#new post endpoint.
 @posts_bp.route('/new_post', methods=['POST'])
 def new_post():
     socketio = current_app.extensions['socketio']
-    user_ip = request.remote_addr
-    post_mode = request.form.get("post_mode", "post") # По умолчанию считаем, что это пост
-    post_name = request.form.get("name", "")
+    # Используем X-Forwarded-For если есть (для работы за прокси), иначе remote_addr
+    user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    post_mode = request.form.get("post_mode", "post") # Default to post if not provided
+    post_name = request.form.get("name", "Anonymous") # Default name
     board_id = request.form.get('board_id')
-    comment = request.form.get('text', "")
-    embed = request.form.get('embed', "")
+    comment = request.form.get('text', '') # Default to empty string
+    embed = request.form.get('embed', '')
     captcha_input = 'none'
 
-    # --- Базовые проверки ---
     if not board_id:
-        flash('Ошибка: Не указана доска.')
-        return redirect(request.referrer or '/') # Возврат на предыдущую или главную
+        flash('Board ID is missing.')
+        return redirect(request.referrer or url_for('main.index')) # Redirect to referrer or main index
 
     if database_module.verify_board_captcha(board_id):
-        captcha_input = request.form.get('captcha', '')
-        if not captcha_input: # Добавим проверку, что капча вообще передана, если она требуется
-             flash("Необходимо ввести капчу.")
-             # Используем f-строку для формирования URL доски
-             return redirect(request.referrer or f'/{board_id}/')
+         # Проверяем наличие поля captcha перед доступом
+        if 'captcha' not in request.form:
+             flash("Captcha is required for this board.")
+             return redirect(request.referrer)
+        captcha_input = request.form['captcha']
 
-    if formatting.filter_xss(comment):
-        flash('Недопустимые символы в комментарии.')
-        return redirect(request.referrer or f'/{board_id}/')
+    # Проверка XSS (можно улучшить библиотекой, например bleach)
+    if formatting.filter_xss(comment) or formatting.filter_xss(post_name):
+        flash('HTML tags are not allowed.')
+        return redirect(request.referrer)
 
-    if formatting.filter_xss(post_name):
-        flash('Недопустимые символы в имени.')
-        return redirect(request.referrer or f'/{board_id}/')
-
-    # --- Инициализация обработчика ---
-    # Передаем исходный comment в handler, форматирование происходит внутри
     handler = PostHandler(socketio, user_ip, post_mode, post_name, board_id, comment, embed, captcha_input)
 
-    # --- Проверки таймаута и доски ---
+    if not handler.check_banned():
+        return redirect(request.referrer)
+
     if not handler.check_timeout():
-        return redirect(request.referrer or f'/{board_id}/')
-    if not handler.check_board():
-        # check_board уже устанавливает flash, просто редиректим
-        return redirect(request.referrer or '/') # На главную, т.к. доска не существует
+        return redirect(request.referrer)
 
-    # --- Определение режима: Reply или Post ---
-    is_reply = False
-    reply_to = request.form.get('thread_id') # Явный ответ из формы
+    # --- Логика определения режима поста (явный или по комментарию) ---
+    is_reply_mode = (post_mode == "reply")
+    reply_to_match = re.match(r'^#(\d+)', comment) # Проверяем комментарий на #<id>
 
-    # Проверка на неявный ответ через #NNN в начале комментария
-    # Работаем с handler.raw_comment для проверки и очистки
-    match = re.match(r'^#(\d+)', handler.raw_comment.strip())
-    if match:
-        potential_reply_to = match.group(1)
-        # Убедимся, что пост #NNN существует НА ЭТОЙ доске
-        # Предполагаем, что такая функция существует в database_module
-        # Если нет, нужно ее добавить или использовать check_post_exist, но с проверкой board_id
-        if database_module.check_post_exist_on_board(int(potential_reply_to), board_id): # Уточненная проверка
-            reply_to = potential_reply_to
-            is_reply = True
-            # Очищаем #NNN из комментария, если это неявный реплай
-            handler.raw_comment = re.sub(r'^#\d+\s*', '', handler.raw_comment).strip()
-            # Переформатируем комментарий без #NNN
-            handler.comment = formatting.format_comment(handler.raw_comment)
+    if is_reply_mode:
+        # Явный режим ответа
+        reply_to = request.form.get('thread_id')
+        if not reply_to:
+            flash("Reply mode selected, but thread ID is missing.")
+            return redirect(request.referrer)
+        # Удаляем #<id> из начала комментария, если он там есть, чтобы не дублировалось
+        if reply_to_match and reply_to_match.group(1) == reply_to:
+             handler.comment = formatting.format_comment(comment[len(reply_to_match.group(0)):].lstrip())
 
-    # Если reply_to был установлен явно или через #NNN
-    if reply_to:
-        is_reply = True # Убедимся, что флаг установлен, если reply_to не пустой
-
-    # --- Вызов соответствующего обработчика ---
-    if is_reply:
-        if not reply_to: # Дополнительная проверка на случай странных ошибок
-            flash("Ошибка: Не указан ID треда для ответа.")
-            # Редирект на доску, если ID треда потерялся
-            return redirect(request.referrer or f'/{board_id}/')
-
-        # Вызываем handle_reply, который теперь сам проверяет наличие контента
+        if not handler.validate_comment() and not request.files.getlist('fileInput'): # Валидация + проверка на наличие файлов
+             # Сообщение об ошибке будет установлено в validate_comment или process_uploaded_files
+             return redirect(request.referrer)
         if not handler.handle_reply(reply_to):
-            # handle_reply уже установил flash при ошибке
-            # Редирект обратно в тред в случае ошибки
-            return redirect(f'/{board_id}/thread/{reply_to}' or request.referrer) # Явный путь к треду
-        else:
-             # Успешный реплай, возвращаемся в тред
-             # ИСПРАВЛЕНО: Добавлен '/thread/'
-             return redirect(f'/{board_id}/thread/{reply_to}' or request.referrer)
+            return redirect(request.referrer)
 
-    else: # Это новый пост
-        # Вызываем handle_post, который проверяет и текст, и файл
+    elif reply_to_match:
+        # Комментарий начинается с #<id>, неявный режим ответа
+        reply_to = reply_to_match.group(1)
+        # Проверяем, существует ли такой пост (может быть и тред, и ответ)
+        if not database_module.check_post_exist(int(reply_to)):
+             flash(f"Post #{reply_to} not found.")
+             return redirect(request.referrer)
+        # Удаляем #<id> из комментария перед обработкой
+        original_comment_without_ref = comment[len(reply_to_match.group(0)):].lstrip()
+        handler.comment = formatting.format_comment(original_comment_without_ref)
+        handler.original_content = original_comment_without_ref # Обновляем и оригинал без #id
+
+        # Определяем тред, к которому относится пост #reply_to
+        thread_id_for_reply = database_module.get_thread_id_for_post(int(reply_to))
+        if not thread_id_for_reply:
+             # Это может случиться, если пост был удален между проверкой и этим моментом
+             flash(f"Could not determine the thread for post #{reply_to}.")
+             return redirect(request.referrer)
+
+        if not handler.validate_comment() and not request.files.getlist('fileInput'):
+             return redirect(request.referrer)
+        if not handler.handle_reply(str(thread_id_for_reply)): # Передаем ID треда
+            return redirect(request.referrer)
+
+    else:
+        # Режим создания нового треда
+        # Валидация для треда: нужен либо текст, либо файл (но handle_post проверит наличие файла)
+        if not handler.validate_comment() and not request.files.getlist('fileInput'):
+            flash("You need to type something or upload a file to start a thread.")
+            return redirect(request.referrer)
         if not handler.handle_post():
-            # handle_post уже установил flash при ошибке
-            return redirect(request.referrer or f'/{board_id}/') # Редирект на доску при ошибке
-        else:
-            # Успешный пост, возвращаемся на доску
-            return redirect(f'/{board_id}/' or request.referrer) # Редирект на доску при успехе
+            return redirect(request.referrer)
 
-    # --- Страховочный return (добавлен для устранения ошибки 'did not return a valid response') ---
-    # Если код каким-то образом дошел сюда, значит, ни один из return выше не сработал.
-    # Лучше вернуть пользователя на предыдущую страницу с сообщением об ошибке.
-    flash("Произошла непредвиденная ошибка при обработке вашего запроса.")
-    # Пытаемся получить board_id, который должен был быть определен выше
-    # Использование board_id здесь безопасно, т.к. проверка if not board_id была в начале
-    referrer_fallback = f'/{board_id}/' if board_id else '/'
-    return redirect(request.referrer or referrer_fallback)
+    # Успешное создание поста/ответа
+    flash("Post successful!") # Добавим сообщение об успехе
+    # Перенаправляем на ту же доску
+    return redirect(request.referrer)
 
 
-@posts_bp.route('/socket.io/')
-def socket_io():
-    socketio_manage(request.environ, {'/': SocketIOHandler}, request=request)
+# Этот эндпоинт обычно обрабатывается библиотекой SocketIO, его может не быть здесь
+# @posts_bp.route('/socket.io/')
+# def socket_io():
+#     # Эта логика обычно внутри app.py или где инициализируется SocketIO
+#     # from flask_socketio import socketio_manage
+#     # socketio_manage(request.environ, {'/': SocketIOHandler}, request=request)
+#     pass # Оставим пустым или удалим, если не используется явно

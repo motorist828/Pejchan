@@ -4,6 +4,8 @@ function manipularConteudo() {
     postContents.forEach(function(postContent) {
         var content = postContent.innerHTML;
 
+        content = content.replace(/\[wikinet\](.*?)\[\/wikinet\]/g, '<a class="wikinet-hyper-link" href="https://wikinet.pro/wiki/$1" target="_blank"><span>$1</span></a>');
+
         content = content.replace(/\[([^\]]+)\]\((https?:\/\/[^\s]+(?:\S)*)\)/g, '<a class="hyper-link" href="$2">$1</a>');
 
         content = content.split('&gt;&gt;').map((part, index) => {
@@ -36,7 +38,7 @@ function manipularConteudo() {
         content = content.split('(((').map((part, index) => {
             if (index === 0) return part;
             const match = part.match(/^([^\)]+)\)\)\)(.*)/);
-            return match ? `<a href="https://wikinet.pro/wiki/${match[1]}" target="_blank" style="text-decoration: none;"><span class="detected">(((${match[1]})))</span></a>${match[2]}` : `(((${part}`;
+            return match ? `<span class="detected">(((${match[1]})))</span>${match[2]}` : `(((${part}`;
         }).join('');
 
         content = content.split('==').map((part, index) => {
@@ -60,7 +62,7 @@ function manipularConteudo() {
 
 
 function adicionarEventosQuoteReply() {
-    
+
     const quoteReplies = document.querySelectorAll('.quote-reply');
 
     quoteReplies.forEach(span => {
@@ -83,7 +85,7 @@ function adicionarEventosQuoteReply() {
 
                 targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-                const offset = 100; 
+                const offset = 100;
                 const elementPosition = targetElement.getBoundingClientRect().top + window.scrollY;
                 const offsetPosition = elementPosition - offset;
 
@@ -93,7 +95,7 @@ function adicionarEventosQuoteReply() {
                 });
             }
         });
-        
+
         span.addEventListener('mouseenter', (event) => {
             const targetId = span.getAttribute('data-id');
             const targetElement = document.getElementById(targetId);
@@ -103,19 +105,18 @@ function adicionarEventosQuoteReply() {
                 const replies = preview.querySelectorAll('div.replies');
                 replies.forEach(reply => reply.remove());
                 if (!preview.style.backgroundColor) {
-                    preview.style.backgroundColor = 'var(--cor-fundo-claro)';
+                    
                 }
                 preview.style.position = 'absolute';
                 preview.style.zIndex = '1000';
-                preview.style.border = '1px solid #ccc';
-                preview.style.padding = '10px';
-                preview.style.display = 'block'; 
+                
+                preview.style.display = 'block';
 
                 document.body.appendChild(preview);
 
                 const updatePreviewPosition = (e) => {
-                    preview.style.left = `${e.pageX + 10}px`; 
-                    preview.style.top = `${e.pageY + 10}px`; 
+                    preview.style.left = `${e.pageX + 10}px`;
+                    preview.style.top = `${e.pageY + 10}px`;
                 };
 
                 document.addEventListener('mousemove', updatePreviewPosition);
@@ -158,52 +159,159 @@ function quotePostId(postId) {
     draggableForm.style.top = `${newTop}px`;
 }
 
-	document.addEventListener("DOMContentLoaded", function() {
-		manipularConteudo();
-		 
-		const textarea = document.getElementById('text');
-		let quoteButton;
+document.addEventListener("DOMContentLoaded", function() {
+    manipularConteudo();
 
-		document.addEventListener('mouseup', () => {
-			const selection = window.getSelection();
-			if (selection.toString()) {
-				if (!quoteButton) {
-					quoteButton = document.createElement('button');
-					quoteButton.className = 'quote-button';
-					quoteButton.innerText = 'Quotar';
-					document.body.appendChild(quoteButton); 
-				}
+    const textarea = document.getElementById('text');
+    let quoteButton;
 
-				const range = selection.getRangeAt(0);
-				const rect = range.getBoundingClientRect();
+    document.addEventListener('mouseup', () => {
+        const selection = window.getSelection();
+        if (selection.toString()) {
+            if (!quoteButton) {
+                quoteButton = document.createElement('button');
+                quoteButton.className = 'quote-button';
+                quoteButton.innerText = 'Quotar';
+                document.body.appendChild(quoteButton);
+            }
 
-				quoteButton.style.left = `${rect.left + window.scrollX}px`;
-				quoteButton.style.top = `${rect.top + window.scrollY - 10}px`;
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
 
-				requestAnimationFrame(() => {
-					quoteButton.style.display = 'block'; 
-				});
-			} else if (quoteButton) {
-				quoteButton.style.display = 'none'; 
-			}
-		});
+            quoteButton.style.left = `${rect.left + window.scrollX}px`;
+            quoteButton.style.top = `${rect.top + window.scrollY - 10}px`;
 
-		document.addEventListener('click', (e) => {
-			if (quoteButton && e.target !== quoteButton) {
-				quoteButton.style.display = 'none';
-			}
-		});
+            requestAnimationFrame(() => {
+                quoteButton.style.display = 'block';
+            });
+        } else if (quoteButton) {
+            quoteButton.style.display = 'none';
+        }
+    });
 
-		document.addEventListener('click', (e) => {
-			if (quoteButton && e.target === quoteButton) {
-				const selection = window.getSelection();
-				const selectedText = selection.toString();
-				textarea.value += '' + (textarea.value ? '\n>' : '>') + selectedText;
-				quoteButton.style.display = 'none';
-				window.getSelection().removeAllRanges();
-			}
-		});
-	});
+    document.addEventListener('click', (e) => {
+        if (quoteButton && e.target !== quoteButton) {
+            quoteButton.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (quoteButton && e.target === quoteButton) {
+            const selection = window.getSelection();
+            const selectedText = selection.toString();
+            textarea.value += '' + (textarea.value ? '\n>' : '>') + selectedText;
+            quoteButton.style.display = 'none';
+            window.getSelection().removeAllRanges();
+        }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Função principal que formata a data
+    function formatDate(element) {
+        const dateString = element.textContent.trim();
+        
+        try {
+            // Converte a string para um objeto Date (formato dd/mm/aaaa HH:MM:SS)
+            const [datePart, timePart] = dateString.split(' ');
+            const [day, month, year] = datePart.split('/').map(Number);
+            const [hours, minutes, seconds] = timePart.split(':').map(Number);
+            
+            const date = new Date(year, month - 1, day, hours, minutes, seconds);
+            
+            // Calcula a diferença em relação ao agora
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+            
+            // Define os intervalos de tempo
+            const intervals = {
+                year: 31536000,
+                month: 2592000,
+                week: 604800,
+                day: 86400,
+                hour: 3600,
+                minute: 60,
+                second: 1
+            };
+            
+// Calculate relative time
+            let relativeTime = '';
+            // Assuming 'intervals' keys are already in English: e.g., { year: ..., month: ..., day: ..., hour: ..., minute: ..., second: ... }
+            for (const [unit, secondsInUnit] of Object.entries(intervals)) {
+                const interval = Math.floor(diffInSeconds / secondsInUnit);
+                if (interval >= 1) {
+                    // English format: "1 {unit} ago" or "{interval} {units} ago"
+                    relativeTime = interval === 1 ?
+                        `1 ${unit} ago` :          // Singular case
+                        `${interval} ${unit}s ago`; // Plural case (appends 's')
+                    break; // Found the largest appropriate unit, exit loop
+                }
+            }
+
+            // Optional: Handle cases where the difference is very small (less than the smallest unit in intervals)
+            if (!relativeTime && diffInSeconds >= 0) {
+                 // You might want a specific output like "just now" or "less than a minute ago"
+                 relativeTime = 'just now';
+            }
+            
+            // Armazena a data original como um atributo de dados
+            element.dataset.originalDate = dateString;
+            
+            // Atualiza o conteúdo do elemento
+            element.textContent = relativeTime;
+            
+            // Adiciona um título com a data original para acessibilidade
+            element.setAttribute('title', dateString);
+            
+            return true;
+        } catch (e) {
+            console.error('Erro ao formatar data no elemento:', element, 'Erro:', e);
+            return false;
+        }
+    }
+
+    // Função para atualizar todas as datas periodicamente
+    function updateAllDates() {
+        document.querySelectorAll('span.postDate').forEach(element => {
+            // Restaura a data original antes de formatar novamente
+            if (element.dataset.originalDate) {
+                element.textContent = element.dataset.originalDate;
+            }
+            formatDate(element);
+        });
+    }
+
+    // Observador de mutação para novos elementos adicionados dinamicamente
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+                // Verifica se o nó é um elemento
+                if (node.nodeType === 1) {
+                    // Verifica se é um span.postDate
+                    if (node.matches('span.postDate')) {
+                        formatDate(node);
+                    }
+                    // Verifica os descendentes
+                    if (node.querySelectorAll) {
+                        node.querySelectorAll('span.postDate').forEach(formatDate);
+                    }
+                }
+            });
+        });
+    });
+
+    // Configura e inicia o observador
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    // Formata todas as datas inicialmente
+    document.querySelectorAll('span.postDate').forEach(formatDate);
+
+    // Atualiza as datas a cada minuto (60000 ms)
+    setInterval(updateAllDates, 60000);
+});
 
 const checkboxes = document.querySelectorAll('#togglemodoptions');
 

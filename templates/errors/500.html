@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internal Server Error</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .error-container { max-width: 600px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; background-color: #f9f9f9; text-align: center; }
+        h1 { color: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1>500 - Internal Server Error</h1>
+        <p>Произошла внутренняя ошибка сервера. Мы уже работаем над ее устранением.</p>
+        {% if error_message %}
+            <p><strong>Сообщение:</strong> {{ error_message }}</p>
+        {% endif %}
+        <p><a href="{{ url_for('boards.main_page') }}">Вернуться на главную страницу</a></p>
+        {# В режиме отладки можно выводить больше информации, но не в продакшене #}
+        {# {% if config.DEBUG and e %}
+            <pre>{{ e }}</pre>
+        {% endif %} #}
+    </div>
+</body>
+</html>

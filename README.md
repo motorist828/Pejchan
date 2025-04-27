@@ -1,7 +1,8 @@
 # Pejchan
 
 This imageboad is an improvement of [rchan](https://github.com/lainsec/rchan)
-Added thumbnails, Russian language, support for mp3 files, improved form for sending posts, design changes
+Added thumbnails, support for mp3 files, improved form for sending posts, design changes
+Сonvenient viewing of media files, improved statistics, bug fixes, many other minor improvements
 
 ![pic0](./img/1.png)
 ![pic0](./img/2.png)
