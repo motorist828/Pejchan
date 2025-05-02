@@ -1,185 +1,258 @@
+// --- START OF FILE thread.js ---
+
+/**
+ * Форматирует специальную разметку в постах и ответах (цитаты, ссылки, спойлеры и т.д.).
+ * Эта функция должна вызываться после загрузки контента и при добавлении новых постов/ответов.
+ */
 function manipularConteudo() {
+    // Выбираем все элементы <pre>, предполагая, что контент поста/ответа находится внутри них
     var postContents = document.querySelectorAll('pre');
 
     postContents.forEach(function(postContent) {
+        // Получаем HTML-содержимое элемента <pre>
+        // ВАЖНО: работаем с innerHTML, так как форматирование добавляет HTML-теги
         var content = postContent.innerHTML;
 
-        content = content.replace(/\[wikinet\](.*?)\[\/wikinet\]/g, '<a class="wikinet-hyper-link" href="https://wikinet.pro/wiki/$1" target="_blank"><span>$1</span></a>');
+        // --- Форматирование ссылок ---
+        // [wikinet]...[/wikinet] -> <a href="https://wikinet.pro/wiki/...">...</a>
+        content = content.replace(/\[wikinet\](.*?)\[\/wikinet\]/g, '<a class="wikinet-hyper-link" href="https://wikinet.pro/wiki/$1" target="_blank" rel="noopener noreferrer"><span>$1</span></a>');
+        // [text](url) -> <a href="url">text</a>
+        content = content.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)<]+(?:\S)*)\)/g, '<a class="hyper-link" href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 
-        content = content.replace(/\[([^\]]+)\]\((https?:\/\/[^\s]+(?:\S)*)\)/g, '<a class="hyper-link" href="$2">$1</a>');
-
-        content = content.split('&gt;&gt;').map((part, index) => {
+        // --- Форматирование цитат >>id ---
+        content = content.split('>>').map((part, index) => { // Используем HTML entity для >>
             if (index === 0) return part;
-            const number = part.match(/^\d+/);
-            if (number) {
-                const quotedId = number[0];
-                const quotedDiv = document.querySelector(`div[id="${quotedId}"]`);
-                const isOperator = quotedDiv && quotedDiv.getAttribute('post-role') === 'operator';
-
-                const quoteSpan = `<span class="quote-reply" data-id="${quotedId}">&gt;&gt;${quotedId}</span>`;
+            const numberMatch = part.match(/^\d+/);
+            if (numberMatch) {
+                const quotedId = numberMatch[0];
+                const targetDiv = document.querySelector(`div.post[id="${quotedId}"], div.reply[id="${quotedId}"]`);
+                const isOperator = targetDiv && targetDiv.classList.contains('post') && targetDiv.getAttribute('post-role') === 'operator';
+                const quoteSpan = `<span class="quote-reply" data-id="${quotedId}">>>${quotedId}</span>`;
                 const operatorSpan = isOperator ? `<span class="operator-quote">(OP)</span>` : '';
                 return `${quoteSpan}${operatorSpan}${part.slice(quotedId.length)}`;
             }
-            return `&gt;&gt;${part}`;
+            return `>>${part}`;
         }).join('');
 
-        content = content.split('&gt;').map((part, index) => {
+        // --- Форматирование зеленых строк >text ---
+        content = content.split('>').map((part, index) => { // Используем HTML entity для >
             if (index === 0) return part;
-            const match = part.match(/^[^<&\n]+/);
-            return match ? `<span class="verde">&gt;${match}</span>${part.slice(match[0].length)}` : `&gt;${part}`;
+            const textMatch = part.match(/^[^<&\n]+/);
+            if (textMatch && textMatch[0].trim() !== '') {
+                return `<span class="verde">>${textMatch[0]}</span>${part.slice(textMatch[0].length)}`;
+            }
+            return `>${part}`;
         }).join('');
 
-        content = content.split('&lt;').map((part, index) => {
+        // --- Форматирование красных строк <text ---
+        content = content.split('<').map((part, index) => { // Используем HTML entity для <
             if (index === 0) return part;
-            const match = part.match(/^[^<&\n]+/);
-            return match ? `<span class="vermelho">&lt;${match}</span>${part.slice(match[0].length)}` : `&lt;${part}`;
+            const textMatch = part.match(/^[^<&\n]+/);
+             if (textMatch && textMatch[0].trim() !== '') {
+                return `<span class="vermelho"><${textMatch[0]}</span>${part.slice(textMatch[0].length)}`;
+            }
+            return `<${part}`;
         }).join('');
 
+        // --- Форматирование обнаруженного текста (((text))) ---
         content = content.split('(((').map((part, index) => {
             if (index === 0) return part;
-            const match = part.match(/^([^\)]+)\)\)\)(.*)/);
-            return match ? `<span class="detected">(((${match[1]})))</span>${match[2]}` : `(((${part}`;
+            const match = part.match(/^([^\)]+)\)\)\)(.*)/s);
+            if (match) {
+                return `<span class="detected">(((${match[1]})))</span>${match[2]}`;
+            }
+            return `(((${part}`;
         }).join('');
 
+        // --- Форматирование красного текста ==text== ---
         content = content.split('==').map((part, index) => {
             if (index % 2 === 1) return `<span class="red-text">${part}</span>`;
             return part;
         }).join('');
 
+        // --- Форматирование спойлеров ||text|| ---
         content = content.split('||').map((part, index) => {
             if (index % 2 === 1) return `<span class="spoiler">${part}</span>`;
             return part;
         }).join('');
 
-        content = content.split('[spoiler]').join('<span class="spoiler">').split('[/spoiler]').join('</span>');
+        // --- Форматирование спойлеров [spoiler]text[/spoiler] ---
+        content = content.replace(/\[spoiler\]/gi, '<span class="spoiler">')
+                         .replace(/\[\/spoiler\]/gi, '</span>');
 
-        content = content.split('[r]').join('<span class="rainbowtext">').split('[/r]').join('</span>');
+        // --- Форматирование радужного текста [r]text[/r] ---
+        content = content.replace(/\[r\]/gi, '<span class="rainbowtext">')
+                         .replace(/\[\/r\]/gi, '</span>');
 
+        // Применяем измененное содержимое обратно к элементу <pre>
         postContent.innerHTML = content;
     });
+
+    // После форматирования добавляем обработчики событий к новым элементам цитат
     adicionarEventosQuoteReply();
 }
 
 
+/**
+ * Добавляет обработчики событий (клик и наведение) к элементам цитат (>>id).
+ */
 function adicionarEventosQuoteReply() {
-
     const quoteReplies = document.querySelectorAll('.quote-reply');
+    let previewElement = null; // Хранит текущий элемент превью
+    let updatePreviewPositionListener = null; // Хранит ссылку на обработчик движения мыши
 
     quoteReplies.forEach(span => {
-        span.addEventListener('click', () => {
+        // --- Обработчик клика по цитате ---
+        span.addEventListener('click', (event) => {
+            event.preventDefault();
             const targetId = span.getAttribute('data-id');
             const targetElement = document.getElementById(targetId);
 
             if (targetElement) {
-                document.querySelectorAll('.target').forEach(el => {
-                    el.style.backgroundColor = '';
+                document.querySelectorAll('.highlighted-quote').forEach(el => {
+                    el.classList.remove('highlighted-quote');
                 });
-
-                targetElement.style.backgroundColor = '#6d99ba73';
-                targetElement.style.borderColor = '#82cece';
-
+                targetElement.classList.add('highlighted-quote');
                 setTimeout(() => {
-                    targetElement.style.backgroundColor = '';
-                    targetElement.style.borderColor = '';
-                }, 2000);
-
-                targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-                const offset = 100;
+                    if (targetElement.classList.contains('highlighted-quote')) {
+                        targetElement.classList.remove('highlighted-quote');
+                    }
+                }, 2500);
+                const offset = 80;
                 const elementPosition = targetElement.getBoundingClientRect().top + window.scrollY;
                 const offsetPosition = elementPosition - offset;
-
-                window.scrollTo({
-                    top: offsetPosition,
-                    behavior: 'smooth'
-                });
+                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+            } else {
+                console.warn(`Элемент с ID "${targetId}" не найден для цитаты.`);
             }
         });
 
+        // --- Обработчик наведения мыши на цитату (показ превью) ---
         span.addEventListener('mouseenter', (event) => {
+            if (previewElement && document.body.contains(previewElement)) {
+                document.body.removeChild(previewElement);
+                if(updatePreviewPositionListener) {
+                    document.removeEventListener('mousemove', updatePreviewPositionListener);
+                }
+            }
+
             const targetId = span.getAttribute('data-id');
             const targetElement = document.getElementById(targetId);
 
             if (targetElement) {
-                const preview = targetElement.cloneNode(true);
-                const replies = preview.querySelectorAll('div.replies');
-                replies.forEach(reply => reply.remove());
-                if (!preview.style.backgroundColor) {
-                    
-                }
-                preview.style.position = 'absolute';
-                preview.style.zIndex = '1000';
-                
-                preview.style.display = 'block';
+                previewElement = targetElement.cloneNode(true);
+                const repliesBlock = previewElement.querySelector('div.replies');
+                if (repliesBlock) repliesBlock.remove();
+                previewElement.classList.add('quote-preview');
+                previewElement.classList.remove('highlighted-quote');
+                previewElement.style.backgroundColor = '';
+                previewElement.style.borderColor = '';
+                previewElement.style.position = 'absolute';
+                previewElement.style.zIndex = '1000';
+                previewElement.style.display = 'block';
+                previewElement.style.maxWidth = '400px';
+                document.body.appendChild(previewElement);
 
-                document.body.appendChild(preview);
-
-                const updatePreviewPosition = (e) => {
-                    preview.style.left = `${e.pageX + 10}px`;
-                    preview.style.top = `${e.pageY + 10}px`;
-                };
-
-                document.addEventListener('mousemove', updatePreviewPosition);
-
-                span.addEventListener('mouseleave', () => {
-                    if (preview && document.body.contains(preview)) {
-                        document.body.removeChild(preview);
-                        document.removeEventListener('mousemove', updatePreviewPosition);
+                updatePreviewPositionListener = (e) => {
+                    let left = e.pageX + 15;
+                    let top = e.pageY + 15;
+                    if (left + previewElement.offsetWidth > window.innerWidth) {
+                        left = e.pageX - previewElement.offsetWidth - 15;
                     }
-                });
+                    if (top + previewElement.offsetHeight > window.innerHeight + window.scrollY) {
+                       top = e.pageY - previewElement.offsetHeight - 15;
+                    }
+                    if (left < 0) left = 0;
+                    if (top < window.scrollY) top = window.scrollY;
+                    previewElement.style.left = `${left}px`;
+                    previewElement.style.top = `${top}px`;
+                };
+                updatePreviewPositionListener(event);
+                document.addEventListener('mousemove', updatePreviewPositionListener);
+            }
+        });
+
+        // --- Обработчик ухода мыши с цитаты (удаление превью) ---
+        span.addEventListener('mouseleave', () => {
+            if (previewElement && document.body.contains(previewElement)) {
+                document.body.removeChild(previewElement);
+                previewElement = null;
+            }
+            if(updatePreviewPositionListener) {
+                document.removeEventListener('mousemove', updatePreviewPositionListener);
+                updatePreviewPositionListener = null;
             }
         });
     });
 }
 
+/**
+ * Вставляет ID поста/ответа в текстовое поле формы ответа.
+ * Вызывается при клике на ID поста/ответа.
+ * @param {string|number} postId - ID поста или ответа для цитирования.
+ */
 function quotePostId(postId) {
-    const textarea = document.getElementById('text');
-    const draggableForm = document.getElementById('draggableForm');
-
-    textarea.value += '' + (textarea.value ? '\n>>' : '>>') + postId;
-
-    draggableForm.style.position = 'absolute';
-
-    const mouseX = event.pageX;
-    const mouseY = event.pageY + 10;
-
-    const rightEdge = window.innerWidth - draggableForm.offsetWidth;
-    const bottomEdge = window.innerHeight - draggableForm.offsetHeight;
-
-    let newLeft = mouseX;
-    let newTop = mouseY;
-
-    if (newLeft < 0) newLeft = 0;
-    if (newTop < 0) newTop = 0;
-    if (newLeft > rightEdge) newLeft = rightEdge;
-    if (newTop > bottomEdge) newTop = bottomEdge;
-
-    draggableForm.style.display = 'block';
-    draggableForm.style.left = `${newLeft}px`;
-    draggableForm.style.top = `${newTop}px`;
+    const textarea = document.getElementById('text'); // ID текстового поля
+    if (!textarea) {
+        console.error('Текстовое поле с ID "text" не найдено.');
+        return;
+    }
+    const quoteText = '>>' + postId;
+    const currentText = textarea.value;
+    const textToInsert = (currentText ? '\n' : '') + quoteText + '\n';
+    if (textarea.selectionStart || textarea.selectionStart === 0) {
+        const startPos = textarea.selectionStart;
+        const endPos = textarea.selectionEnd;
+        textarea.value = currentText.substring(0, startPos) + textToInsert + currentText.substring(endPos, currentText.length);
+        textarea.selectionStart = textarea.selectionEnd = startPos + textToInsert.length;
+    } else {
+        textarea.value += textToInsert;
+    }
+    textarea.focus();
 }
 
+
+// --- Обработчики событий после загрузки DOM ---
+
+// Обработчик для кнопки "Quote Selection"
 document.addEventListener("DOMContentLoaded", function() {
-    manipularConteudo();
-
     const textarea = document.getElementById('text');
-    let quoteButton;
+    let quoteButton = null;
 
-    document.addEventListener('mouseup', () => {
+    document.addEventListener('mouseup', (event) => {
+        if (quoteButton && quoteButton.contains(event.target)) return;
+        const formElement = document.getElementById('postForm'); // ID вашей формы
+        if (formElement && formElement.contains(event.target)) return;
+
         const selection = window.getSelection();
-        if (selection.toString()) {
+        const selectedText = selection.toString().trim();
+
+        if (selectedText) {
             if (!quoteButton) {
                 quoteButton = document.createElement('button');
-                quoteButton.className = 'quote-button';
-                quoteButton.innerText = 'Quotar';
+                quoteButton.type = 'button';
+                quoteButton.className = 'quote-selection-button';
+                quoteButton.innerText = 'Quote Selection';
+                quoteButton.style.position = 'absolute';
+                quoteButton.style.zIndex = '1010';
+                quoteButton.style.display = 'none';
                 document.body.appendChild(quoteButton);
+
+                quoteButton.addEventListener('click', () => {
+                    const currentText = textarea.value;
+                    const textToInsert = selectedText.split('\n').map(line => '>' + line).join('\n');
+                    const finalText = (currentText ? currentText + '\n' : '') + textToInsert + '\n';
+                    textarea.value = finalText;
+                    textarea.focus();
+                    quoteButton.style.display = 'none';
+                    window.getSelection().removeAllRanges();
+                });
             }
 
             const range = selection.getRangeAt(0);
             const rect = range.getBoundingClientRect();
-
-            quoteButton.style.left = `${rect.left + window.scrollX}px`;
-            quoteButton.style.top = `${rect.top + window.scrollY - 10}px`;
+            quoteButton.style.left = `${rect.left + window.scrollX + 5}px`;
+            quoteButton.style.top = `${rect.top + window.scrollY - quoteButton.offsetHeight - 5}px`;
 
             requestAnimationFrame(() => {
                 quoteButton.style.display = 'block';
@@ -189,139 +262,146 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    document.addEventListener('click', (e) => {
-        if (quoteButton && e.target !== quoteButton) {
-            quoteButton.style.display = 'none';
-        }
-    });
-
-    document.addEventListener('click', (e) => {
-        if (quoteButton && e.target === quoteButton) {
+    document.addEventListener('mousedown', (e) => {
+        if (quoteButton && quoteButton.style.display === 'block' && !quoteButton.contains(e.target)) {
             const selection = window.getSelection();
-            const selectedText = selection.toString();
-            textarea.value += '' + (textarea.value ? '\n>' : '>') + selectedText;
-            quoteButton.style.display = 'none';
-            window.getSelection().removeAllRanges();
+             if (!selection.toString().trim()) {
+                quoteButton.style.display = 'none';
+             }
         }
     });
 });
 
+
+// Обработчик для форматирования дат
 document.addEventListener('DOMContentLoaded', function() {
-    // Função principal que formata a data
+
+    const twelveHoursInMs = 12 * 60 * 60 * 1000;
+    const minutesInMs = 60 * 1000;
+    const hoursInMs = 60 * minutesInMs;
+
+    /**
+     * Форматирует дату как относительное время или полную дату.
+     * @param {Date} dateObject - Объект Date для форматирования.
+     * @returns {string|null} - Строка относительного времени или null.
+     */
+    function formatRelativeTime(dateObject) {
+        const now = new Date();
+        const diffInMs = now.getTime() - dateObject.getTime();
+
+        if (diffInMs > twelveHoursInMs) return null; // Старше 12 часов
+
+        const diffInSeconds = Math.round(diffInMs / 1000);
+        const diffInMinutes = Math.round(diffInMs / minutesInMs);
+        const diffInHours = Math.round(diffInMs / hoursInMs);
+
+        if (diffInSeconds < 60) return "just now";
+        if (diffInMinutes < 60) return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`;
+        return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`;
+    }
+
+    /**
+     * Обновляет текстовое содержимое элемента с датой.
+     * @param {HTMLElement} element - Элемент span.postDate.
+     */
     function formatDate(element) {
-        const dateString = element.textContent.trim();
-        
+        const isoDateString = element.dataset.isoDate;
+        if (!isoDateString) return;
+
         try {
-            // Converte a string para um objeto Date (formato dd/mm/aaaa HH:MM:SS)
-            const [datePart, timePart] = dateString.split(' ');
-            const [day, month, year] = datePart.split('/').map(Number);
-            const [hours, minutes, seconds] = timePart.split(':').map(Number);
-            
-            const date = new Date(year, month - 1, day, hours, minutes, seconds);
-            
-            // Calcula a diferença em relação ao agora
-            const now = new Date();
-            const diffInSeconds = Math.floor((now - date) / 1000);
-            
-            // Define os intervalos de tempo
-            const intervals = {
-                year: 31536000,
-                month: 2592000,
-                week: 604800,
-                day: 86400,
-                hour: 3600,
-                minute: 60,
-                second: 1
-            };
-            
-// Calculate relative time
-            let relativeTime = '';
-            // Assuming 'intervals' keys are already in English: e.g., { year: ..., month: ..., day: ..., hour: ..., minute: ..., second: ... }
-            for (const [unit, secondsInUnit] of Object.entries(intervals)) {
-                const interval = Math.floor(diffInSeconds / secondsInUnit);
-                if (interval >= 1) {
-                    // English format: "1 {unit} ago" or "{interval} {units} ago"
-                    relativeTime = interval === 1 ?
-                        `1 ${unit} ago` :          // Singular case
-                        `${interval} ${unit}s ago`; // Plural case (appends 's')
-                    break; // Found the largest appropriate unit, exit loop
-                }
+            const date = new Date(isoDateString);
+            if (isNaN(date.getTime())) {
+                 console.error('Invalid date value:', isoDateString);
+                 element.textContent = "Invalid Date";
+                 return;
             }
 
-            // Optional: Handle cases where the difference is very small (less than the smallest unit in intervals)
-            if (!relativeTime && diffInSeconds >= 0) {
-                 // You might want a specific output like "just now" or "less than a minute ago"
-                 relativeTime = 'just now';
+            const relativeTimeString = formatRelativeTime(date);
+
+            if (relativeTimeString !== null) {
+                element.textContent = relativeTimeString;
+                // Форматируем полную дату для title
+                const fullDateFormatter = new Intl.DateTimeFormat('ru-RU', { // Локаль для title
+                   dateStyle: 'medium', // e.g., "1 мая 2025 г."
+                   timeStyle: 'medium'  // e.g., "03:45:10"
+                });
+                element.title = fullDateFormatter.format(date);
+            } else {
+                // Форматируем полную дату для отображения
+                const fullDateFormatter = new Intl.DateTimeFormat('ru-RU', { // Локаль для отображения
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit',
+                    // timeZone: 'Europe/Moscow' // Раскомментируйте для конкретного пояса
+                });
+                element.textContent = fullDateFormatter.format(date);
+                element.title = ''; // Убираем title
             }
-            
-            // Armazena a data original como um atributo de dados
-            element.dataset.originalDate = dateString;
-            
-            // Atualiza o conteúdo do elemento
-            element.textContent = relativeTime;
-            
-            // Adiciona um título com a data original para acessibilidade
-            element.setAttribute('title', dateString);
-            
-            return true;
         } catch (e) {
-            console.error('Erro ao formatar data no elemento:', element, 'Erro:', e);
-            return false;
+            console.error('Date formatting error:', e);
+            element.textContent = "Error";
         }
     }
 
-    // Função para atualizar todas as datas periodicamente
+    /**
+     * Обновляет все видимые даты на странице.
+     */
     function updateAllDates() {
-        document.querySelectorAll('span.postDate').forEach(element => {
-            // Restaura a data original antes de formatar novamente
-            if (element.dataset.originalDate) {
-                element.textContent = element.dataset.originalDate;
-            }
-            formatDate(element);
-        });
+        document.querySelectorAll('span.postDate[data-iso-date]').forEach(formatDate);
     }
 
-    // Observador de mutação para novos elementos adicionados dinamicamente
+    /**
+     * Наблюдатель за изменениями DOM для новых элементов.
+     */
     const observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
             mutation.addedNodes.forEach(function(node) {
-                // Verifica se o nó é um elemento
                 if (node.nodeType === 1) {
-                    // Verifica se é um span.postDate
-                    if (node.matches('span.postDate')) {
+                    if (node.matches && node.matches('span.postDate[data-iso-date]')) {
                         formatDate(node);
                     }
-                    // Verifica os descendentes
                     if (node.querySelectorAll) {
-                        node.querySelectorAll('span.postDate').forEach(formatDate);
+                        node.querySelectorAll('span.postDate[data-iso-date]').forEach(formatDate);
                     }
                 }
             });
         });
     });
 
-    // Configura e inicia o observador
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
+    observer.observe(document.body, { childList: true, subtree: true });
 
-    // Formata todas as datas inicialmente
-    document.querySelectorAll('span.postDate').forEach(formatDate);
+    // Первоначальное форматирование
+    updateAllDates();
 
-    // Atualiza as datas a cada minuto (60000 ms)
-    setInterval(updateAllDates, 60000);
-});
+    // Периодическое обновление (каждые 30 секунд)
+    setInterval(updateAllDates, 30000);
 
-const checkboxes = document.querySelectorAll('#togglemodoptions');
+}); // Конец обработчика DOMContentLoaded для дат
 
-    checkboxes.forEach(checkbox => {
-      checkbox.addEventListener('change', () => {
-        const parentDiv = checkbox.closest('div');
-        const threadModOptions = parentDiv.querySelector('#threadmodoptions');
 
-        if (threadModOptions) {
-          threadModOptions.style.display = checkbox.checked ? 'flex' : 'none';
+// Обработчик для чекбоксов модерации
+document.addEventListener('DOMContentLoaded', function() {
+    document.body.addEventListener('change', function(event) {
+        // 1. Проверяем, что событие произошло на нужном чекбоксе (по классу и ID)
+        if (event.target.matches('input.deletionCheckBox[id^="togglemodoptions_"]')) {
+            const checkbox = event.target;
+            // 2. Ищем КОНКРЕТНОГО родителя по классу
+            const postInfoDiv = checkbox.closest('.postInfo, .reply-postInfo');
+            if (postInfoDiv) {
+                // 3. Ищем блок опций модерации по КЛАССУ ВНУТРИ этого родителя
+                const modOptions = postInfoDiv.querySelector('.thread-mod-options, .reply-mod-options');
+
+                if (modOptions) {
+                    // 4. Устанавливаем display: 'flex' (как в старом коде) или 'none'
+                    modOptions.style.display = checkbox.checked ? 'flex' : 'none';
+                } else {
+                     // Если опции не найдены ВНУТРИ .postInfo/.reply-postInfo
+                     console.warn('Блок опций модерации (.thread-mod-options или .reply-mod-options) не найден ВНУТРИ:', postInfoDiv);
+                }
+            } else {
+                 console.warn('Родительский div (.postInfo или .reply-postInfo) не найден для чекбокса:', checkbox);
+            }
         }
-      });
+    });
 });
+
+// --- END OF FILE thread.js ---

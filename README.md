@@ -29,8 +29,9 @@ pip install -r requirements.txt
 
 ## How to use
 ```bash
+ run database_setup.py once
  python3 app.py or python app.py depending on your OS
-`The first account will automatically get OWNER permissions. 
+`The password and administrator name are set in the database_setup.py file.. 
  Use a long enough password when registering.
  You can change the name in the templates\index.html file. Line #21
  About - /templates/utils/index-about-container.html`

@@ -4,7 +4,7 @@
   {% set is_board_owner = session["username"] == board_info.board_owner %}
   
   {% if is_board_owner or is_moderator %}
-    <div id="threadmodoptions" class="mod-options" style="display: none; gap: 1em; padding-left: 1em;">
+    <div class="thread-mod-options mod-options" style="display: none; gap: 1em; padding-left: 1em;">
       <!-- Pin Post -->
       <form action="/pin_post/{{ post.post_id }}" method="post" class="mod-action-form">
         <input type="hidden" name="board_owner" value="{{ board_info.board_owner }}">

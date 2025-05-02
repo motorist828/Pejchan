@@ -1,39 +1,42 @@
 <div class="boards-container">
     <div class="tabuas">
         <table class="boards-table">
-            {# Существующая логика подсчета постов #}
-            {% set post_counts = {} %}
-            {% for post in all_posts %}
-                {% set board_uri = post.get('board') %}
-                {# Добавлена проверка, что board_uri существует, чтобы избежать ошибок #}
-                {% if board_uri %}
-                    {% if board_uri in post_counts %}
-                        {% set post_counts = post_counts.update({board_uri: post_counts[board_uri] + 1}) %}
-                    {% else %}
-                        {% set post_counts = post_counts.update({board_uri: 1}) %}
-                    {% endif %}
-                {% endif %}
-            {% endfor %}
+            {# ---- БЛОК ПОДСЧЕТА ПОЛНОСТЬЮ УДАЛЕН ---- #}
 
             <thead>
                 <tr>
-                    {# Используем lang.get с запасным вариантом на случай отсутствия ключа перевода #}
                     <th>{{ lang.get("board-list-boardname", "Board") }}</th>
                     <th>{{ lang.get("board-list-boarddesc", "Description") }}</th>
-                    <th>{{ lang.get("board-list-posts", "Posts") }}</th>
-                    <th>{{ lang.get("board-list-replay", "Replay") }}</th>
+                    <th>{{ lang.get("board-list-threads", "Threads") }}</th> {# Заголовок для количества тредов #}
+                    <th>{{ lang.get("board-list-replies", "Replies") }}</th> {# Заголовок для количества ответов #}
+                    <th>{{ lang.get("board-list-total", "Total") }}</th>   {# Заголовок для общего количества #}
                 </tr>
             </thead>
-            {# Исправлено: tbody должен быть снаружи цикла для корректной структуры таблицы #}
             <tbody>
+                {# Итерируемся по списку досок 'boards', полученному из контекстного процессора globalboards #}
+                {# Предполагается, что 'boards' содержит словари с ключами: #}
+                {# 'board_uri', 'board_desc', 'thread_count', 'total_posts' #}
+                {# И что контекстный процессор inject_reply_counts предоставляет словарь 'reply_counts' #}
                 {% for board in boards %}
                 <tr>
-                    <td><a class="board_link" href="/{{ board.get('board_uri') }}">/{{ board.get('board_uri') }}/</a></td>
-                    <td>{{ board.get('board_desc') }}</td>
-                    <td>{{ post_counts.get(board.get('board_uri'), 0) }}</td> {# Используем .get для безопасности #}
-                    <td>{{ reply_counts.get(board.get('board_uri'), 0) }}</td> {# <-- Новая ячейка с количеством ответов #}
+                    {# Ссылка на доску #}
+                    <td><a class="board_link" href="/{{ board.get('board_uri') }}/">/{{ board.get('board_uri') }}/</a></td>
+                    {# Описание доски (с резервным текстом) #}
+                    <td>{{ board.get('board_desc', 'No description') }}</td>
+                    {# Количество тредов (из данных доски) #}
+                    <td>{{ board.get('thread_count', 0) }}</td>
+                    {# Количество ответов (из словаря reply_counts) #}
+                    <td>{{ reply_counts.get(board.get('board_uri'), 0) }}</td>
+                    {# Общее количество постов (из данных доски) #}
+                    <td>{{ board.get('total_posts', 0) }}</td>
                 </tr>
-                {% endfor %}
+                {# Блок 'else' выполнится, если список 'boards' пуст #}
+                {% else %}
+                <tr>
+                    {# Сообщение о том, что досок нет, растягивается на все 5 колонок #}
+                    <td colspan="5">{{ lang.get("board-list-no-boards", "No boards available.") }}</td>
+                </tr>
+                {% endfor %} {# Завершение цикла for board in boards #}
             </tbody>
         </table>
     </div>

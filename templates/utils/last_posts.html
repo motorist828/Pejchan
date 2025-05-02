@@ -4,25 +4,38 @@
         {% for post in posts %}
         <div class="last-post">
             <div class="last_post_info">
-                <a href="/{{ post.get('board') }}/">/{{ post.get('board') }}/</a>
+                {# Используем правильный ключ board_uri для текста ссылки #}
+                <a href="/{{ post.get('board_uri') }}/">/{{ post.get('board_uri') }}/</a>
             </div>
 
             <!-- Оборачиваем изображение в ссылку -->
             <div class="last_post_image">
-                <a href="/{{ post.get('board') }}/thread/{{post.get('post_id')}}" style="display: block;"> <!-- Ссылка на тред -->
+                {# Используем правильный ключ board_uri для URL ссылки #}
+                <a href="/{{ post.get('board_uri') }}/thread/{{ post.get('post_id') }}" style="display: block;"> <!-- Ссылка на тред -->
 
-                 
-                 <img draggable="false"
-                      class="post_img"
-                      src="{{ url_for('static', filename='post_images/' ~ post.imagesthb[0]) }}"
-                      alt="Изображение к посту {{ post.get('post_id') }}"> <!-- Убрали href, добавили alt -->
+                 {# Проверяем, что imagesthb_list существует и не пуст #}
+                 {% if post.imagesthb_list and post.imagesthb_list[0] %}
+                     {# Используем imagesthb_list для src #}
+                     <img draggable="false"
+                          class="post_img"
+                          src="{{ url_for('static', filename=post.imagesthb_list[0]) }}" {# Используем уже готовый относительный путь #}
+                          alt="Изображение к посту {{ post.get('post_id') }}">
+                 {% else %}
+                     {# Можно добавить плейсхолдер, если миниатюры нет #}
+                     <img draggable="false" class="post_img" src="{{ url_for('static', filename='placeholder.png') }}" alt="Нет изображения">
+                 {% endif %}
 
-                 
                 </a> <!-- Закрываем тег ссылки -->
             </div>
 
             <div class="last_post_content">
-                <a href="/{{ post.get('board') }}/thread/{{post.get('post_id')}}">{{ post.get('post_content')[:250] }}...</a>
+                 {# Используем правильный ключ board_uri для URL ссылки #}
+                <a href="/{{ post.get('board_uri') }}/thread/{{ post.get('post_id') }}">
+                    {# Отображаем HTML-контент безопасно или используем original_content #}
+                    {# Если post_content содержит HTML теги, используйте |safe только если вы АБСОЛЮТНО уверены в его безопасности #}
+                    {# Лучше отображать original_content или очищенный текст #}
+                    {{ post.get('original_content', '')[:250] | striptags }}... {# Пример: Показываем оригинальный контент без тегов #}
+                </a>
             </div>
         </div>
         {% endfor %}

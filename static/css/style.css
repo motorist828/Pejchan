@@ -836,7 +836,8 @@ input[type=button], input[type=file], input[type=number], input[type=password], 
   flex-wrap: wrap;
   flex-direction: column;
   align-items: flex-start;
-  width: 100%;
+  margin-right: 0.8em;
+  width: -webkit-fill-available;
   justify-content: flex-start;
   left: 0;
 }

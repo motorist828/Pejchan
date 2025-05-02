@@ -4,7 +4,7 @@
   {% set is_board_owner = session["username"] == board_info.board_owner %}
   
   {% if is_board_owner or is_moderator %}
-    <div id="threadmodoptions" class="mod-options" style="display: none; gap: 1em;">
+    <div class="reply-mod-options mod-options" style="display: none; gap: 1em;">
       <form action="/delete_reply/{{ reply.reply_id }}" method="post" class="mod-action-form"
             onsubmit="return confirm('Are you sure you want to delete this reply?');">
         <input type="hidden" name="board_owner" value="{{ board_info.board_owner }}">

@@ -1,80 +1,121 @@
+{# --- START OF FILE replies.html (или часть thread_reply.html) --- #}
+
 <div class="posts" id="posts_board">
+    {# Мы ожидаем, что 'posts' содержит список с ОДНИМ элементом - OP треда #}
     {% for post in posts %}
     <div class="divisoria"></div>
-    <div class="post" post-role="operator" id="{{ post.post_id }}">
+    <div class="post" post-role="operator" id="{{ post.post_id }}"> {# Используем post.post_id #}
         <div class="postInfo">
-            <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" form="banDeleteForm">
-            <span class="nameBlock"><span class="name">{% if post.post_user == '' or post.post_user == 'Anonymous' %}Anon {% else %}{{ post.post_user | safe }}{% endif %}</span> </span>&nbsp;
-            <span class="postDate">{{ post.post_date }}</span>&nbsp;
+            <input id="togglemodoptions_post_{{ post.post_id }}" type="checkbox" class="deletionCheckBox" value="{{ post.post_id }}" form="banDeleteForm">
+            <span class="nameBlock"><span class="name">{% if not post.post_user or post.post_user == 'Anonymous' %}Anon{% else %}{{ post.post_user | safe }}{% endif %}</span> </span> 
+            <span class="postDate" data-iso-date="{{ post.post_date }}">{{ post.date_display }}</span> 
 			<a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No.</a> <a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ post.post_id }}">{{ post.post_id }}</a>{% include 'utils/thread-moderation-options.html' %}
         </div>
         <div class="post_content_container">
-            <div class="post_files {% if post.post_images|length > 1 %}multiple_files{% endif %}">
-                {% for image in post.post_images %}
-				
-				
+
+            {# --- Отображение файлов OP --- #}
+            {# Проверяем наличие списка post_images_list #}
+            {% if post.post_images_list %}
+            <div class="post_files {% if post.post_images_list | length > 1 %}multiple_files{% endif %}">
+                {# Итерируемся по списку оригинальных имен файлов #}
+                {% for image_filename in post.post_images_list %}
+                    {# Получаем соответствующий путь к миниатюре из imagesthb_list по тому же индексу #}
+                    {% set thumb_path = post.imagesthb_list[loop.index0] if post.imagesthb_list and loop.index0 < post.imagesthb_list | length else None %}
+                    {# Формируем URL для оригинального изображения #}
+                    {% set image_url = url_for('static', filename= 'post_images/' + image_filename) %}
+
                     <div class="post_image">
                         <div class="post_image_info">
-                            <a class="image_url" href="/static/post_images/{{ image }}">
-                                {{ image }}
+                            {# Ссылка на оригинал #}
+                            <a class="image_url" href="{{ image_url }}">
+                                {{ image_filename }} {# Показываем имя файла #}
                             </a>
                         </div>
-         							 <img draggable="false" class="post_img" 
-                                                        src="{{ url_for('static', filename='post_images/' ~ post.imagesthb[loop.index0]) }}"
-														href="/static/post_images/{{ image }}"
-                                                        alt="">
-								 
-
+                        {# Отображаем миниатюру, если она есть #}
+                        {% if thumb_path %}
+                            
+                                <img draggable="false" class="post_img"
+                                     src="{{ url_for('static', filename=thumb_path) }}" {# Используем путь к миниатюре #}
+                                     <a href="{{ image_url }}"> {# Делаем миниатюру ссылкой на оригинал #}>
+                            </a>
+                        {% else %}
+                             {# Можно показать плейсхолдер, если миниатюры нет #}
+                             <a href="{{ image_url }}">
+                                <img draggable="false" class="post_img placeholder_img" src="{{ url_for('static', filename='placeholder.png') }}" alt="No thumbnail">
+                             </a>
+                        {% endif %}
                     </div>
                 {% endfor %}
             </div>
+            {% endif %} {# Конец if post.post_images_list #}
+
             <div class="post_content">
+                {# Отображаем форматированный контент (с HTML), если уверены в безопасности #}
+                {# Используйте post.original_content | striptags для безопасности #}
                 <pre>{{ post.post_content | safe }}</pre>
             </div>
+
+            {# --- Отображение ответов --- #}
             <div class="replies">
-                {% for reply in replies %}
-                <div class="reply" id="{{ reply.reply_id }}">
+                {% for reply in replies %} {# Итерируемся по списку ответов #}
+                <div class="reply" id="{{ reply.reply_id }}"> {# Используем reply.reply_id #}
                     <div class="reply-postInfo">
-                        <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" name="{{ post.post_id }}" form="banDeleteForm">
-                        <span class="nameBlock"><span class="name">{% if not reply.post_user or reply.post_user == '' %}Anon{% else %}{{ reply.post_user | safe }}{% endif %}</span> </span>
-                        <span class="postDate">{{ reply.post_date }}</span>&nbsp;
-				<a href="/{{ board_id }}/thread/{{ reply.reply_id }}" class="postLink">No.</a>
+                        <input id="togglemodoptions_reply_{{ reply.reply_id }}" type="checkbox" class="deletionCheckBox" value="{{ reply.reply_id }}" form="banDeleteForm">
+                        <span class="nameBlock"><span class="name">{% if not reply.post_user or reply.post_user == 'Anonymous' %}Anon{% else %}{{ reply.post_user | safe }}{% endif %}</span> </span>
+                        <span class="postDate" data-iso-date="{{ reply.post_date }}">{{ reply.date_display }}</span>&nbsp; 
+				        <a href="#{{ reply.reply_id }}" class="postLink">No.</a> {# Ссылка на якорь #}
 						<a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ reply.reply_id }}">{{ reply.reply_id }}</a>
-						{% include 'utils/reply-moderation-options.html' %}
+						{% include 'utils/reply-moderation-options.html' %} {# Передаем reply в инклуд, если нужно #}
                     </div>
-                    <div class="post_content_container">
-                        {% if reply.get('images') or reply.get('image') %}
-                            <div class="reply_files {% if reply.get('images') and reply.images|length > 1 %}multiple_files{% endif %}">
-                                {% for image in reply.get('images', [reply.get('image', '')]) %}
-								{% set thb_image = reply.imagesthb if (reply.imagesthb is string) else (reply.imagesthb[loop.index0] if (reply.imagesthb and loop.index0 < reply.imagesthb|length) else image) %}
-                                <div class="reply_image">
-                                        {% if image %}
-                                            <div class="reply_file">
-                                                <div class="reply_image_info">
-                                                    <a class="image_url" href="/static/reply_images/{{ image }}">
-                                                        {{ image }}
-                                                    </a>
-                                                </div>
+                    <div class="post_content_container"> {# У ответов тоже может быть контейнер #}
+
+                        {# --- Отображение файлов ответа --- #}
+                        {# Проверяем наличие списка images_list #}
+                        {% if reply.images_list %}
+                            <div class="reply_files {% if reply.images_list | length > 1 %}multiple_files{% endif %}">
+                                {# Итерируемся по списку оригинальных имен файлов ответа #}
+                                {% for image_filename in reply.images_list %}
+                                    {# Получаем соответствующий путь к миниатюре из imagesthb_list по тому же индексу #}
+                                    {% set thumb_path = reply.imagesthb_list[loop.index0] if reply.imagesthb_list and loop.index0 < reply.imagesthb_list | length else None %}
+                                    {# Формируем URL для оригинального изображения ответа #}
+                                    {% set image_url = url_for('static', filename= 'reply_images/' + image_filename) %}
+
+                                    <div class="reply_image"> {# Можно использовать тот же класс или свой #}
+                                        <div class="reply_image_info">
+                                            {# Ссылка на оригинал #}
+                                            <a class="image_url" href="{{ image_url }}">
+                                                {{ image_filename }} {# Показываем имя файла #}
+                                            </a>
+                                        </div>
+                                        {# Отображаем миниатюру, если она есть #}
+                                        {% if thumb_path %}
                                             
-                                                    <img draggable="false" class="reply_img" 
-                                                        src="{{ url_for('static', filename='reply_images/' ~ thb_image) }}"
-														href="/static/reply_images/{{ image }}"
-                                                        alt="">
-                                                
-                                            </div>
+                                                <img draggable="false" class="reply_img" {# Используем класс reply_img или post_img #}
+                                                     src="{{ url_for('static', filename=thumb_path) }}" {# Используем путь к миниатюре #}
+                                                     <a href="{{ image_url }}"> {# Делаем миниатюру ссылкой на оригинал #}
+                                            </a>
+                                        {% else %}
+                                             {# Плейсхолдер, если миниатюры нет #}
+                                             <a href="{{ image_url }}">
+                                                <img draggable="false" class="reply_img placeholder_img" src="{{ url_for('static', filename='placeholder.png') }}" alt="No thumbnail">
+                                             </a>
                                         {% endif %}
-                                </div>
+                                    </div>
                                 {% endfor %}
                             </div>
-                        {% endif %}
+                        {% endif %} {# Конец if reply.images_list #}
+
                         <div class="reply_content">
-                            <pre>{{ reply.content | safe }}</pre>
+                            {# Отображаем форматированный контент ответа #}
+                            <pre>{{ reply.content | safe }}</pre> {# Опять же, осторожно с |safe #}
                         </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
+                    </div> {# Конец post_content_container для ответа #}
+                </div> {# Конец div.reply #}
+                {% endfor %} {# Конец цикла по ответам #}
+            </div> {# Конец div.replies #}
+        </div> {# Конец post_content_container для OP #}
+    </div> {# Конец div.post для OP #}
+    {% endfor %} {# Конец цикла по OP (должен быть один) #}
+</div> {# Конец div.posts #}
+
+{# --- END OF FILE replies.html (или часть thread_reply.html) --- #}

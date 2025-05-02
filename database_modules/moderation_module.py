@@ -1,402 +1,288 @@
 """
-Timeout Management Module using LainDB
-Handles user timeouts with thread-safe operations.
+Timeout and Ban Management Module using SQLite
+Handles user timeouts and bans.
 """
 
 import threading
-from datetime import datetime, timedelta
-from laindb.laindb import Lainconfig
+from datetime import datetime, timedelta, timezone
+import sqlite3
+import os
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
+# --- Database Configuration ---
+DATABASE_DIR = 'instance'
+DATABASE_PATH = os.path.join(DATABASE_DIR, 'imageboard.db') # Use the same DB file
+
+def get_db_conn():
+    """Establishes a connection to the SQLite database."""
+    # Duplicated from database_module for simplicity here, consider a shared db utility
+    try:
+        os.makedirs(DATABASE_DIR, exist_ok=True)
+        conn = sqlite3.connect(DATABASE_PATH, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON;")
+        return conn
+    except sqlite3.Error as e:
+        logger.error(f"Database connection error: {e}", exc_info=True)
+        raise
+
+# --- Helper for executing queries (similar to database_module) ---
+def execute_query(query, params=(), fetchone=False, commit=False):
+    """Executes a given SQL query for moderation tables."""
+    conn = None
+    try:
+        conn = get_db_conn()
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        if commit:
+            conn.commit()
+            return cursor.lastrowid
+        if fetchone:
+            return cursor.fetchone()
+        else:
+            return cursor.fetchall()
+    except sqlite3.Error as e:
+        logger.error(f"Moderation DB query error: {e}\nQuery: {query}\nParams: {params}", exc_info=True)
+        if conn and commit: conn.rollback()
+        return None
+    except Exception as e:
+         logger.error(f"Unexpected error during moderation query: {e}", exc_info=True)
+         if conn and commit: conn.rollback()
+         return None
+    finally:
+        if conn:
+            conn.close()
+
+# --- Timeout Management ---
 class TimeoutManager:
     def __init__(self):
-        # Initialize LainDB for timeout management
-        self.db = Lainconfig.load_db('moderation')
-        self.db.create_table('timeouts', {
-            'user_ip': 'str',
-            'user_role': 'str',
-            'end_time': 'str',
-            'reason': 'str',
-            'moderator': 'str',
-            'applied_at': 'str'
-        })
-        
-        self.lock = threading.Lock()
-        self.active_timers = {}
-        
-    def apply_timeout(self, user_ip, duration_seconds=35, reason="", moderator="System"):
-        """
-        Apply a timeout to a user.
-        
-        Args:
-            user_ip (str): User's IP address
-            duration_seconds (int): Timeout duration in seconds
-            reason (str): Reason for timeout
-            moderator (str): Moderator who applied the timeout
-            
-        Returns:
-            bool: True if timeout was applied successfully
-        """
-        with self.lock:
-            end_time = (datetime.now() + timedelta(seconds=duration_seconds)).isoformat()
-            applied_at = datetime.now().isoformat()
-            
-            # Check if user already has a timeout
-            existing = self.db.query('timeouts', {'user_ip': {'==': user_ip}})
-            
-            if existing:
-                # Update existing timeout
-                timeout_id = existing[0]['id']
-                self.db.update('timeouts', timeout_id, {
-                    'user_role': 'timeout',
-                    'end_time': end_time,
-                    'reason': reason,
-                    'moderator': moderator,
-                    'applied_at': applied_at
-                })
-            else:
-                # Create new timeout record
-                max_timeout_id = max([timeout['id'] for timeout in self.db.find_all('timeouts')] + [0])
-                timeout_id = max_timeout_id + 1
+        self.lock = threading.Lock() # Protect access if timers modify DB directly
+        self.active_timers = {} # Store timers keyed by IP for cancellation
+        self.cleanup_expired() # Clean up on startup
 
-                self.db.insert('timeouts', {
-                    'id': timeout_id,
-                    'user_ip': user_ip,
-                    'user_role': 'timeout',
-                    'end_time': end_time,
-                    'reason': reason,
-                    'moderator': moderator,
-                    'applied_at': applied_at
-                })
-            
-            self._setup_timer(timeout_id, duration_seconds)
-            return True
-    
-    def _setup_timer(self, timeout_id, duration):
-        """
-        Setup a timer to automatically remove timeout.
-        
-        Args:
-            timeout_id (int): ID of the timeout record
-            duration (int): Timeout duration in seconds
-        """
-        if timeout_id in self.active_timers:
-            self.active_timers[timeout_id].cancel()
-        
-        timer = threading.Timer(duration, self.remove_timeout, args=[timeout_id])
-        timer.daemon = True
-        timer.start()
-        self.active_timers[timeout_id] = timer
-    
-    def remove_timeout(self, timeout_id):
-        """
-        Remove a timeout by its ID.
-        
-        Args:
-            timeout_id (int): ID of the timeout record
-        """
+    def apply_timeout(self, user_ip, duration_seconds=35, reason="", moderator="System"):
+        """Apply or update a timeout for a user."""
         with self.lock:
-            self.db.delete('timeouts', timeout_id)
-            
-            if timeout_id in self.active_timers:
-                timer = self.active_timers.pop(timeout_id)
-                timer.cancel()
-    
+            now = datetime.now(timezone.utc)
+            end_time_dt = now + timedelta(seconds=duration_seconds)
+            end_time_iso = end_time_dt.isoformat()
+            applied_at_iso = now.isoformat()
+
+            # Use INSERT OR REPLACE for simplicity (requires UNIQUE constraint on user_ip)
+            sql = """
+                INSERT OR REPLACE INTO timeouts (user_ip, end_time, reason, moderator, applied_at)
+                VALUES (?, ?, ?, ?, ?)
+            """
+            params = (user_ip, end_time_iso, reason, moderator, applied_at_iso)
+
+            result = execute_query(sql, params, commit=True)
+
+            if result is not None:
+                logger.info(f"Timeout applied/updated for IP {user_ip} until {end_time_iso}. Reason: {reason}")
+                # Restart timer if needed
+                self._setup_timer(user_ip, duration_seconds)
+                return True
+            else:
+                logger.error(f"Failed to apply timeout for IP {user_ip}.")
+                return False
+
+    def _setup_timer(self, user_ip, duration):
+        """Setup or reset a timer to automatically remove timeout."""
+        # Cancel existing timer for this IP if it exists
+        if user_ip in self.active_timers:
+            self.active_timers[user_ip].cancel()
+
+        # Create and start a new timer
+        # Note: The timer calls remove_timeout_by_ip, which needs to be thread-safe
+        timer = threading.Timer(duration, self.remove_timeout_by_ip, args=[user_ip])
+        timer.daemon = True # Allow program to exit even if timers are running
+        timer.start()
+        self.active_timers[user_ip] = timer
+
+    def remove_timeout_by_ip(self, user_ip):
+        """Remove a timeout by user IP."""
+        with self.lock:
+            logger.info(f"Attempting to remove timeout for IP: {user_ip}")
+            sql = "DELETE FROM timeouts WHERE user_ip = ?"
+            execute_query(sql, (user_ip,), commit=True)
+            # Clean up timer reference
+            if user_ip in self.active_timers:
+                del self.active_timers[user_ip]
+
     def check_timeout(self, user_ip):
-        """
-        Check if a user is currently timed out.
-        
-        Args:
-            user_ip (str): User's IP address
-            
-        Returns:
-            dict: Timeout information if active, else {'is_timeout': False}
-        """
-        timeouts = self.db.query('timeouts', {'user_ip': {'==': user_ip}})
-        
-        if not timeouts:
+        """Check if a user is currently timed out."""
+        sql = "SELECT * FROM timeouts WHERE user_ip = ?"
+        timeout = execute_query(sql, (user_ip,), fetchone=True)
+
+        if not timeout:
             return {'is_timeout': False}
-            
-        timeout = timeouts[0]
-        end_time = datetime.fromisoformat(timeout['end_time'])
-        
-        if datetime.now() < end_time:
-            return {
-                'is_timeout': True,
-                'end_time': end_time,
-                'reason': timeout.get('reason', ''),
-                'moderator': timeout.get('moderator', 'System'),
-                'timeout_id': timeout['id']
-            }
-        else:
-            self.remove_timeout(timeout['id'])
-            return {'is_timeout': False}
-    
-    def get_active_timeouts(self):
-        """
-        Get all currently active timeouts.
-        
-        Returns:
-            dict: Dictionary of active timeouts keyed by user IP
-        """
-        active = {}
-        now = datetime.now()
-        
-        # Query all timeouts where end_time is in the future
-        timeouts = self.db.query('timeouts', {
-            'user_role': {'==': 'timeout'}
-        })
-        
-        for timeout in timeouts:
-            end_time = datetime.fromisoformat(timeout['end_time'])
-            
+
+        try:
+            end_time = datetime.fromisoformat(timeout['end_time'].replace('Z', '+00:00'))
+            now = datetime.now(timezone.utc)
+
             if now < end_time:
-                active[timeout['user_ip']] = {
-                    'end_time': end_time,
+                return {
+                    'is_timeout': True,
+                    'end_time': end_time, # Return datetime object
                     'reason': timeout.get('reason', ''),
-                    'moderator': timeout.get('moderator', 'System'),
-                    'applied_at': datetime.fromisoformat(timeout['applied_at']),
-                    'timeout_id': timeout['id']
+                    'moderator': timeout.get('moderator', 'System')
+                    # 'timeout_id' is less relevant now we use IP as key
                 }
             else:
-                self.remove_timeout(timeout['id'])
-        
-        return active
-    
+                # Timeout expired, remove it
+                logger.info(f"Expired timeout found for IP {user_ip}. Removing.")
+                self.remove_timeout_by_ip(user_ip)
+                return {'is_timeout': False}
+        except (ValueError, TypeError) as e:
+             logger.error(f"Error parsing timeout end_time '{timeout['end_time']}' for IP {user_ip}: {e}")
+             # Treat as invalid/expired? Or raise? For safety, treat as not timed out.
+             self.remove_timeout_by_ip(user_ip) # Remove potentially corrupt entry
+             return {'is_timeout': False}
+
+
     def cleanup_expired(self):
-        """
-        Cleanup all expired timeouts.
-        """
-        now = datetime.now()
-        timeouts = self.db.find_all('timeouts')
-        
-        for timeout in timeouts:
-            end_time = datetime.fromisoformat(timeout['end_time'])
-            if now >= end_time:
-                self.remove_timeout(timeout['id'])
+        """Remove all expired timeouts from the database."""
+        with self.lock:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            sql = "DELETE FROM timeouts WHERE end_time <= ?"
+            logger.info("Cleaning up expired timeouts...")
+            execute_query(sql, (now_iso,), commit=True)
+            logger.info("Expired timeouts cleanup complete.")
 
-
+# --- Ban Management ---
 class BanManager:
     def __init__(self):
-        # Initialize LainDB for ban management
-        self.db = Lainconfig.load_db('moderation')
-        self.db.create_table('bans', {
-            'user_ip': 'str',
-            'end_time': 'str',
-            'reason': 'str',
-            'moderator': 'str',
-            'applied_at': 'str',
-            'is_permanent': 'bool'
-        })
-        
         self.lock = threading.Lock()
-        self.active_timers = {}
-        
+        self.active_timers = {} # Store timers keyed by IP for temporary bans
+        self.cleanup_expired() # Clean up on startup
+
     def ban_user(self, user_ip, duration_seconds=None, reason="", moderator="System"):
-        """
-        Ban a user by IP address.
-        
-        Args:
-            user_ip (str): User's IP address
-            duration_seconds (int): Optional ban duration in seconds (None for permanent)
-            reason (str): Reason for ban
-            moderator (str): Moderator who applied the ban
-            
-        Returns:
-            bool: True if ban was applied successfully
-        """
+        """Ban or update a ban for a user."""
         with self.lock:
-            applied_at = datetime.now().isoformat()
+            now = datetime.now(timezone.utc)
+            applied_at_iso = now.isoformat()
             is_permanent = duration_seconds is None
-            
-            if is_permanent:
-                end_time = "permanent"
-            else:
-                end_time = (datetime.now() + timedelta(seconds=duration_seconds)).isoformat()
-            
-            # Check for existing ban
-            existing = self.db.query('bans', {'user_ip': {'==': user_ip}})
-            
-            if existing:
-                # Update existing ban
-                ban_id = existing[0]['id']
-                self.db.update('bans', ban_id, {
-                    'end_time': end_time,
-                    'reason': reason,
-                    'moderator': moderator,
-                    'applied_at': applied_at,
-                    'is_permanent': is_permanent
-                })
-                
-                # Cancel any existing timer for this ban
-                if ban_id in self.active_timers:
-                    self.active_timers[ban_id].cancel()
-            else:
-                # Create new ban record
-                max_id = max([ban['id'] for ban in self.db.find_all('bans')] + [0])
-                ban_id = max_id + 1
-                
-                self.db.insert('bans', {
-                    'id': ban_id,
-                    'user_ip': user_ip,
-                    'end_time': end_time,
-                    'reason': reason,
-                    'moderator': moderator,
-                    'applied_at': applied_at,
-                    'is_permanent': is_permanent
-                })
-            
-            # Setup timer for temporary bans
+
+            end_time_iso = None
             if not is_permanent:
-                self._setup_timer(ban_id, duration_seconds)
-            
-            return True
-    
-    def _setup_timer(self, ban_id, duration):
-        """
-        Setup a timer to automatically remove temporary ban.
-        
-        Args:
-            ban_id (int): ID of the ban record
-            duration (int): Ban duration in seconds
-        """
-        if ban_id in self.active_timers:
-            self.active_timers[ban_id].cancel()
-        
-        timer = threading.Timer(duration, self.unban_user_by_id, args=[ban_id])
+                end_time_dt = now + timedelta(seconds=duration_seconds)
+                end_time_iso = end_time_dt.isoformat()
+
+            # Use INSERT OR REPLACE for simplicity
+            sql = """
+                INSERT OR REPLACE INTO bans (user_ip, end_time, reason, moderator, applied_at, is_permanent)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """
+            params = (user_ip, end_time_iso, reason, moderator, applied_at_iso, 1 if is_permanent else 0)
+
+            result = execute_query(sql, params, commit=True)
+
+            if result is not None:
+                ban_type = "Permanent" if is_permanent else f"Temporary until {end_time_iso}"
+                logger.info(f"{ban_type} ban applied/updated for IP {user_ip}. Reason: {reason}")
+                if not is_permanent:
+                    self._setup_timer(user_ip, duration_seconds)
+                else:
+                    # Cancel any existing timer if the ban became permanent
+                    if user_ip in self.active_timers:
+                         self.active_timers[user_ip].cancel()
+                         del self.active_timers[user_ip]
+                return True
+            else:
+                logger.error(f"Failed to apply ban for IP {user_ip}.")
+                return False
+
+    def _setup_timer(self, user_ip, duration):
+        """Setup or reset timer for temporary bans."""
+        if user_ip in self.active_timers:
+            self.active_timers[user_ip].cancel()
+
+        timer = threading.Timer(duration, self.unban_user, args=[user_ip])
         timer.daemon = True
         timer.start()
-        self.active_timers[ban_id] = timer
-    
+        self.active_timers[user_ip] = timer
+
     def unban_user(self, user_ip):
-        """
-        Remove a ban by user IP.
-        
-        Args:
-            user_ip (str): User's IP address
-            
-        Returns:
-            bool: True if unban was successful, False if user wasn't banned
-        """
+        """Remove a ban by user IP."""
         with self.lock:
-            bans = self.db.query('bans', {'user_ip': {'==': user_ip}})
-            
-            if not bans:
-                return False
-                
-            ban_id = bans[0]['id']
-            return self.unban_user_by_id(ban_id)
-    
-    def unban_user_by_id(self, ban_id):
-        """
-        Remove a ban by its ID.
-        
-        Args:
-            ban_id (int): ID of the ban record
-            
-        Returns:
-            bool: True if unban was successful
-        """
-        with self.lock:
-            self.db.delete('bans', ban_id)
-            
-            if ban_id in self.active_timers:
-                timer = self.active_timers.pop(ban_id)
-                timer.cancel()
-            
-            return True
-    
+            logger.info(f"Attempting to unban IP: {user_ip}")
+            sql = "DELETE FROM bans WHERE user_ip = ?"
+            execute_query(sql, (user_ip,), commit=True)
+            # Clean up timer reference
+            if user_ip in self.active_timers:
+                 self.active_timers[user_ip].cancel() # Ensure timer is stopped
+                 del self.active_timers[user_ip]
+            logger.info(f"Ban removed for IP: {user_ip}")
+            return True # Assume success if no error
+
     def is_banned(self, user_ip):
-        """
-        Check if a user is currently banned.
-        
-        Args:
-            user_ip (str): User's IP address
-            
-        Returns:
-            dict: Ban information if active, else {'is_banned': False}
-        """
-        bans = self.db.query('bans', {'user_ip': {'==': user_ip}})
-        
-        if not bans:
+        """Check if a user is currently banned."""
+        sql = "SELECT * FROM bans WHERE user_ip = ?"
+        ban = execute_query(sql, (user_ip,), fetchone=True)
+
+        if not ban:
             return {'is_banned': False}
-            
-        ban = bans[0]
-        
-        if ban['is_permanent']:
-            return {
+
+        if ban['is_permanent'] == 1:
+             applied_at = datetime.fromisoformat(ban['applied_at'].replace('Z', '+00:00'))
+             return {
                 'is_banned': True,
                 'is_permanent': True,
                 'reason': ban.get('reason', ''),
                 'moderator': ban.get('moderator', 'System'),
-                'applied_at': datetime.fromisoformat(ban['applied_at']),
-                'ban_id': ban['id']
-            }
+                'applied_at': applied_at # Return datetime object
+             }
         else:
-            end_time = datetime.fromisoformat(ban['end_time'])
-            
-            if datetime.now() < end_time:
-                return {
-                    'is_banned': True,
-                    'is_permanent': False,
-                    'end_time': end_time,
-                    'reason': ban.get('reason', ''),
-                    'moderator': ban.get('moderator', 'System'),
-                    'applied_at': datetime.fromisoformat(ban['applied_at']),
-                    'ban_id': ban['id']
-                }
-            else:
-                self.unban_user_by_id(ban['id'])
-                return {'is_banned': False}
-    
-    def get_active_bans(self):
-        """
-        Get all currently active bans.
-        
-        Returns:
-            dict: Dictionary of active bans keyed by user IP
-        """
-        active = {}
-        now = datetime.now()
-        
-        for ban in self.db.find_all('bans'):
-            if ban['is_permanent']:
-                active[ban['user_ip']] = {
-                    'is_permanent': True,
-                    'reason': ban.get('reason', ''),
-                    'moderator': ban.get('moderator', 'System'),
-                    'applied_at': datetime.fromisoformat(ban['applied_at']),
-                    'ban_id': ban['id']
-                }
-            else:
-                end_time = datetime.fromisoformat(ban['end_time'])
-                
+            try:
+                end_time = datetime.fromisoformat(ban['end_time'].replace('Z', '+00:00'))
+                now = datetime.now(timezone.utc)
+
                 if now < end_time:
-                    active[ban['user_ip']] = {
+                    applied_at = datetime.fromisoformat(ban['applied_at'].replace('Z', '+00:00'))
+                    return {
+                        'is_banned': True,
                         'is_permanent': False,
-                        'end_time': end_time,
+                        'end_time': end_time, # Return datetime object
                         'reason': ban.get('reason', ''),
                         'moderator': ban.get('moderator', 'System'),
-                        'applied_at': datetime.fromisoformat(ban['applied_at']),
-                        'ban_id': ban['id']
+                        'applied_at': applied_at # Return datetime object
                     }
                 else:
-                    self.unban_user_by_id(ban['id'])
-        
-        return active
-    
+                    # Ban expired, remove it
+                    logger.info(f"Expired temporary ban found for IP {user_ip}. Removing.")
+                    self.unban_user(user_ip)
+                    return {'is_banned': False}
+            except (ValueError, TypeError) as e:
+                 logger.error(f"Error parsing ban end_time '{ban['end_time']}' for IP {user_ip}: {e}")
+                 # Treat as invalid/expired for safety
+                 self.unban_user(user_ip)
+                 return {'is_banned': False}
+
+
     def cleanup_expired(self):
-        """
-        Cleanup all expired temporary bans.
-        """
-        now = datetime.now()
-        
-        for ban in self.db.find_all('bans'):
-            if not ban['is_permanent']:
-                end_time = datetime.fromisoformat(ban['end_time'])
-                
-                if now >= end_time:
-                    self.unban_user_by_id(ban['id'])
+        """Remove all expired temporary bans."""
+        with self.lock:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            # Delete non-permanent bans where end_time is past
+            sql = "DELETE FROM bans WHERE is_permanent = 0 AND end_time <= ?"
+            logger.info("Cleaning up expired temporary bans...")
+            execute_query(sql, (now_iso,), commit=True)
+            logger.info("Expired temporary bans cleanup complete.")
+
 
 if __name__ == '__main__':
-    print("This module should not be run directly.")
+    logger.info("Moderation module loaded. Running example checks.")
+    # Add any specific tests for moderation here if needed
+    # Example: test timeout
+    # tm = TimeoutManager()
+    # tm.apply_timeout('127.0.0.1', 5, 'Testing timeout')
+    # print(tm.check_timeout('127.0.0.1'))
+    # import time
+    # time.sleep(6)
+    # print(tm.check_timeout('127.0.0.1'))
+    logger.info("This module should be imported.")
