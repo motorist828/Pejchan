@@ -282,74 +282,83 @@ def global_rules():
 # board page endpoint
 @boards_bp.route('/<board_uri>/')
 def board_page(board_uri):
+    """Отображает страницу конкретной доски с постами и пагинацией."""
     try:
+        # 1. Получаем информацию о доске
         board_info_raw = database_module.get_board_info(board_uri)
         if not board_info_raw:
             logger.warning(f"Board not found request: /{board_uri}/")
-            # Render 404 template directly
             return render_template('errors/404.html', message=f"The board '/{board_uri}/' does not exist."), 404
+        board_info = dict(board_info_raw) # Преобразуем в словарь для шаблона
 
-        board_info = dict(board_info_raw) # Convert Row to dict
-
-        # Pagination
+        # 2. Обработка пагинации
         try:
             page = int(request.args.get('page', '1'))
             if page < 1: page = 1
         except ValueError:
             page = 1
-        posts_per_page = 6 # Configurable?
+        posts_per_page = 6 # Количество постов на странице (можно вынести в конфиг)
         offset = (page - 1) * posts_per_page
 
-        # Fetch data using new DB functions
+        # 3. Вычисление общего количества страниц для пагинации
+        # Используем функцию, считающую НЕзакрепленные посты
+        total_non_pinned_posts = database_module.get_board_thread_count(board_uri, include_pinned=False)
+        if total_non_pinned_posts > 0 and posts_per_page > 0:
+            total_pages = (total_non_pinned_posts + posts_per_page - 1) // posts_per_page
+        else:
+            total_pages = 1 # Как минимум одна страница
+
+        # 4. Получение данных из БД
+        # Получаем порцию НЕзакрепленных постов для текущей страницы
         posts_raw = database_module.get_posts_for_board(board_uri, offset=offset, limit=posts_per_page)
+        # Получаем ВСЕ закрепленные посты для этой доски
         pinneds_raw = database_module.get_pinned_posts(board_uri)
-        board_banner = database_module.get_board_banner(board_uri) # Filesystem access
+        # Получаем случайный баннер
+        board_banner = database_module.get_board_banner(board_uri)
 
-        # Generate CAPTCHA
-        captcha_text, captcha_image = database_module.generate_captcha()
-        session['captcha_text'] = captcha_text
-
-        # Get IDs of posts visible on this page (pinned + paginated) to fetch their replies
+        # 5. Получение ответов для видимых постов
         visible_post_ids = [p['post_id'] for p in posts_raw] + [p['post_id'] for p in pinneds_raw]
-
         replies_raw = []
         if visible_post_ids:
             try:
                 replies_raw = database_module.get_replies_for_posts(visible_post_ids)
             except Exception as db_err:
-                 logger.error(f"Error fetching replies for board /{board_uri}/: {db_err}", exc_info=True)
-                 # Continue without replies or show error?
+                 logger.error(f"Error fetching replies for board /{board_uri}/ posts {visible_post_ids}: {db_err}", exc_info=True)
+                 # Решаем, как обрабатывать: можно показать страницу без ответов или с ошибкой
+                 flash("Could not load replies for some posts.", "warning")
 
-        # Format data for template
+        # 6. Форматирование данных для шаблона
         posts = format_content_for_template(posts_raw)
         pinneds = format_content_for_template(pinneds_raw)
         replies = format_content_for_template(replies_raw)
 
-        # Get user roles
+        # 7. Получение информации о пользователе и генерация CAPTCHA
         roles = 'none'
         if 'username' in session:
             roles = database_module.get_user_role(session["username"]) or 'none'
 
-        # Get total non-pinned post count for pagination calculation (needs new db function)
-        # total_posts_count = database_module.get_board_thread_count(board_uri, pinned=False)
-        # total_pages = (total_posts_count + posts_per_page - 1) // posts_per_page # Example calculation
+        captcha_text, captcha_image = database_module.generate_captcha()
+        session['captcha_text'] = captcha_text
 
+        # 8. Рендеринг шаблона со всеми данными
         return render_template(
             'board.html',
-            board_info=board_info,
-            captcha_image=captcha_image,
-            roles=roles,
-            page=page,
-            posts_per_page=posts_per_page, # Pass this for pagination logic in template
-            # total_pages=total_pages, # Pass total pages for pagination links
-            pinneds=pinneds, # Formatted pinned posts
-            posts=posts,     # Formatted paginated posts
-            replies=replies, # Formatted replies
-            board_banner=board_banner,
-            board_id=board_uri, # Keep name board_id for template compatibility
+            board_info=board_info,         # Информация о доске (словарь)
+            captcha_image=captcha_image,   # Изображение CAPTCHA (base64)
+            roles=roles,                   # Роль пользователя
+            page=page,                     # Номер текущей страницы
+            posts_per_page=posts_per_page, # Количество постов на странице
+            total_pages=total_pages,       # Общее количество страниц для пагинации
+            pinneds=pinneds,               # Список закрепленных постов (форматированный)
+            posts=posts,                   # Список постов для текущей страницы (форматированный)
+            replies=replies,               # Список ответов для видимых постов (форматированный)
+            board_banner=board_banner,     # URL баннера
+            board_id=board_uri,            # URI доски (передаем как board_id для совместимости)
         )
     except Exception as e:
-        logger.error(f"Error loading board page /{board_uri}/: {e}", exc_info=True)
+        # Логирование общей ошибки при загрузке страницы
+        logger.error(f"Error loading board page /{board_uri}/ (page {request.args.get('page', '1')}): {e}", exc_info=True)
+        # Отображение страницы с ошибкой 500
         return render_template('errors/500.html', error_message=f"Could not load board /{board_uri}/."), 500
 
 

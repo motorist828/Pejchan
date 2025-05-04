@@ -1,13 +1,77 @@
+{# --- START OF FILE board_pagination.html --- #}
+{% if total_pages > 1 %} {# Показываем пагинацию только если страниц больше одной #}
 <div class="paginate-posts-container">
-    <div class="paginate-posts">
-        {% if page > 1 %}
-            <a href="{{ url_for('boards.board_page', board_uri=board_info.board_uri, page=page - 1) }}"><i class="fa-solid fa-arrow-left"></i></a>
-        {% else %}
-            <i class="fa-solid fa-arrow-left" style="color: #bfbfbf;"></i>
-        {% endif %}
-        <h1>pagina: {{ page }}</h1>
-        {% if posts | length >= posts_per_page %}
-            <a href="{{ url_for('boards.board_page', board_uri=board_info.board_uri, page=page + 1) }}"><i class="fa-solid fa-arrow-right"></i></a>
-        {% endif %}
-    </div>
+    <nav class="paginate-posts" aria-label="Page navigation">
+        <ul class="pagination">
+
+            {# --- Кнопка "Назад" --- #}
+            <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                {# Используем board_id, который должен быть равен board_uri #}
+                <a class="page-link" href="{{ url_for('boards.board_page', board_uri=board_id, page=page - 1) if page > 1 else '#' }}" aria-label="Previous">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </a>
+            </li>
+
+            {# --- Логика отображения номеров страниц --- #}
+            {% set max_visible_pages = 10 %} {# Макс. количество видимых номеров #}
+            {% set half_visible = max_visible_pages // 2 %}
+            {% set start_page = page - half_visible %}
+            {% set end_page = page + half_visible %}
+
+            {# Корректируем начало и конец, если выходим за границы #}
+            {% if start_page < 1 %}
+                {% set start_page = 1 %}
+                {% set end_page = max_visible_pages %}
+            {% endif %}
+            {% if end_page > total_pages %}
+                {% set end_page = total_pages %}
+                {% if (end_page - max_visible_pages + 1) > 1 %} {# Проверяем перед изменением start_page #}
+                  {% set start_page = end_page - max_visible_pages + 1 %}
+                {% else %}
+                   {% set start_page = 1 %} {# Если страниц меньше max_visible_pages #}
+                {% endif %}
+            {% endif %}
+             {# Гарантируем, что end_page не больше total_pages #}
+            {% if end_page > total_pages %}{% set end_page = total_pages %}{% endif %}
+
+            {# --- Ссылка на первую страницу и многоточие (если нужно) --- #}
+            {% if start_page > 1 %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('boards.board_page', board_uri=board_id, page=1) }}">1</a>
+                </li>
+                {% if start_page > 2 %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endif %}
+
+            {# --- Основной диапазон страниц --- #}
+            {% for p in range(start_page, end_page + 1) %}
+                <li class="page-item {% if p == page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('boards.board_page', board_uri=board_id, page=p) }}">{{ p }}</a>
+                </li>
+            {% endfor %}
+
+            {# --- Ссылка на последнюю страницу и многоточие (если нужно) --- #}
+            {% if end_page < total_pages %}
+                {% if end_page < total_pages - 1 %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('boards.board_page', board_uri=board_id, page=total_pages) }}">{{ total_pages }}</a>
+                </li>
+            {% endif %}
+
+            {# --- Кнопка "Вперед" --- #}
+            {% set has_next_page = (page < total_pages) %}
+            <li class="page-item {% if not has_next_page %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('boards.board_page', board_uri=board_id, page=page + 1) if has_next_page else '#' }}" aria-label="Next">
+                     <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </li>
+
+        </ul>
+        {# <div class="page-info">Страница {{ page }} из {{ total_pages }}</div> #}
+    </nav>
 </div>
+{% endif %} {# Конец if total_pages > 1 #}
+{# --- END OF FILE board_pagination.html --- #}

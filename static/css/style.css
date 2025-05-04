@@ -810,25 +810,65 @@ input[type=button], input[type=file], input[type=number], input[type=password], 
 
 .paginate-posts{
   display: flex;
-  align-items: center;
   justify-content: center;
   background-color: var(--cor-fundo-claro);
   padding: 0em 1em;
-  max-height: 2.3em;
-  border-style: none none none solid;
+  max-height: 2.2em;
+  border-radius: 4px;
   border-color: var(--cor-primaria);
   border-width: 1px;
   gap: 1em;
+  align-items: center;
+}
+
+.pagination {
+  display: inline-flex; /* Располагаем элементы в ряд */
+  padding-left: 0; /* Убираем стандартный отступ списка */
+  list-style: none; /* Убираем маркеры списка */
+  border-radius: 0.25rem; /* Небольшое скругление углов */
+  /* border: 1px solid #dee2e6; /* Легкая рамка вокруг всей пагинации (опционально) */
+  /* box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); */ /* Легкая тень */
+}
+
+.page-link {
+  position: relative;
+  display: block;
+  padding: 0.2rem 0.2rem; /* Отступы внутри кнопки/ссылки */
+  margin-left: -1px; /* Убираем двойные рамки между элементами */
+  line-height: 1; /* Высота строки */
+  color: #4b4b4b; /* Цвет текста ссылок (например, синий) */
+  
+  border: 1px solid ; /* Рамка вокруг каждой кнопки/ссылки */
+  text-decoration: none; /* Убираем подчеркивание */
+  
+  font-size: 0.9em; /* Размер шрифта */
+  min-width: 38px; /* Минимальная ширина для единообразия */
+  text-align: center;
 }
 
 .paginate-posts h1{
   user-select: none;
   font-size: 14px;
-  color: var(--cor-primaria);;
+  color: var(--cor-primaria);
 }
 
 .paginate-posts a{
   color: var(--cor-primaria);
+}
+
+.page-item.active .page-link {
+  z-index: 3; /* Выше всех */
+  color: #fff; /* Белый текст */
+  background-color: var(--cor-primaria); /* Основной цвет сайта (например, синий) */
+  border-color: var(--cor-primaria); /* Цвет рамки совпадает с фоном */
+  cursor: default; /* Курсор по умолчанию, т.к. это текущая страница */
+}
+
+.page-item:not(.disabled) .page-link:hover {
+  z-index: 2; /* Поднимаем над соседями при наведении */
+  color: #000; /* Цвет текста при наведении */
+  background-color: #e9ecef; /* Фон при наведении */
+  border-color: #dee2e6; /* Цвет рамки при наведении */
 }
 
 .posts {

@@ -222,7 +222,12 @@ def get_all_boards(include_stats=False):
     if include_stats:
         for board in boards_list:
             board_uri = board['board_uri']
-            thread_sql = "SELECT COUNT(*) as count FROM posts WHERE board_uri = ?"
+            thread_sql = """
+                SELECT COUNT(p.id) as count
+                FROM posts p
+                LEFT JOIN pinned pn ON p.post_id = pn.post_id AND p.board_uri = pn.board_uri
+                WHERE p.board_uri = ? AND pn.post_id IS NULL
+            """
             thread_res = execute_query(thread_sql, (board_uri,), fetchone=True)
             board['thread_count'] = thread_res['count'] if thread_res else 0
             post_ids_sql = "SELECT post_id FROM posts WHERE board_uri = ?"
@@ -241,6 +246,28 @@ def get_all_boards(include_stats=False):
             last_activity_res = execute_query(last_activity_sql, (board_uri,), fetchone=True)
             board['last_activity'] = last_activity_res['last_date'] if last_activity_res else None
     return boards_list
+
+def get_board_thread_count(board_uri, include_pinned=False):
+    """Получает количество тредов (OP) на доске, опционально исключая закрепленные."""
+    if include_pinned:
+        # Считаем ВСЕ посты на доске
+        sql = "SELECT COUNT(*) as count FROM posts WHERE board_uri = ?"
+        params = (board_uri,)
+    else:
+        # Считаем только те, которых НЕТ в таблице pinned для этой доски
+        sql = """
+            SELECT COUNT(p.id) as count
+            FROM posts p
+            LEFT JOIN pinned pn ON p.post_id = pn.post_id AND p.board_uri = pn.board_uri
+            WHERE p.board_uri = ? AND pn.post_id IS NULL
+        """
+        params = (board_uri,)
+
+    # Выполняем запрос и возвращаем результат
+    result = execute_query(sql, params, fetchone=True)
+    # Возвращаем 0, если запрос ничего не вернул или count равен NULL
+    return result['count'] if result and result['count'] is not None else 0
+
 
 def get_max_post_id():
     post_sql = "SELECT MAX(post_id) as max_id FROM posts"
