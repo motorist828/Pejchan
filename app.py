@@ -7,6 +7,7 @@ from blueprints.boards_bp import boards_bp
 from blueprints.auth_bp import auth_bp
 #app configuration.
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 21 * 1000 * 1000
 socketio = SocketIO(app)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.secret_key = 'chavesuperultrasecreta'
