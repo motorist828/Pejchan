@@ -11,7 +11,7 @@
         <div class="post" post-role="operator" id="{{ post.post_id }}"> {# Используем post_id для якоря #}
             <div class="postInfo">
                 {# Уникальный ID и value для чекбокса #}
-                <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" form="banDeleteForm">
+                <input id="togglemodoptions_post_{{ post.post_id }}" type="checkbox" class="deletionCheckBox" value="{{ post.post_id }}" form="banDeleteForm">
                  <span class="nameBlock"><span class="name">{% if not post.post_user or post.post_user == 'Anonymous' %}Anon{% else %}{{ post.post_user | safe }}{% endif %}</span></span> 
                 <span class="postDate" data-iso-date="{{ post.post_date }}">{{ post.date_display }}</span>&nbsp; 
                 <a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No.</a> {# Ссылка на тред #}
@@ -80,7 +80,7 @@
                     {% for reply in last_replies %}
                     <div class="reply" id="{{ reply.reply_id }}"> {# ID для якоря #}
                         <div class="reply-postInfo">
-                            <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" name="{{ post.post_id }}" form="banDeleteForm">
+                            <input id="togglemodoptions_reply_{{ reply.reply_id }}" type="checkbox" class="deletionCheckBox" value="{{ reply.reply_id }}" form="banDeleteForm">
                             <span class="nameBlock"><span class="name">{% if not reply.post_user or reply.post_user == 'Anonymous' %}Anon{% else %}{{ reply.post_user | safe }}{% endif %}</span></span>
                             <span class="postDate" data-iso-date="{{ reply.post_date }}">{{ reply.date_display }}</span>&nbsp;
                             <a href="/{{ board_id }}/thread/{{ post.post_id }}#{{ reply.reply_id }}" class="postLink">No.</a> {# Ссылка на тред + якорь ответа #}
