@@ -13,7 +13,7 @@
                 {# Уникальный ID и value для чекбокса #}
                 <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" form="banDeleteForm">
                  <span class="nameBlock"><span class="name">{% if not post.post_user or post.post_user == 'Anonymous' %}Anon{% else %}{{ post.post_user | safe }}{% endif %}</span></span> 
-                <span class="postDate">{{ post.date_display }}</span>  {# Используем отформатированную дату #}
+                <span class="postDate" data-iso-date="{{ post.post_date }}">{{ post.date_display }}</span>&nbsp; 
                 <a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No.</a> {# Ссылка на тред #}
                 <a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ post.post_id }}">{{ post.post_id }}</a> {# Ссылка для цитирования #}
                 <a class="postLink" href="/{{ board_id }}/thread/{{ post.post_id }}">  [{{ lang.get('thread-reply-button', 'Reply') }}]</a> {# Используем lang.get с fallback #}
@@ -70,7 +70,11 @@
                     {% set hidden_replies_count = (post_replies | length) - (last_replies | length) if (post_replies | length) > reply_limit else 0 %}
 
                     {# Сообщение о скрытых ответах, если они есть #}
-
+                    {% if hidden_replies_count > 0 %}
+                    <div class="hidden-replies">
+                        <span>{{ hidden_replies_count }} {{ lang.get('hidden-replies', 'hidden replies.') }} </span>
+                    </div>
+                    {% endif %}
 
                     {# Отображаем последние ответы #}
                     {% for reply in last_replies %}
@@ -78,7 +82,7 @@
                         <div class="reply-postInfo">
                             <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" name="{{ post.post_id }}" form="banDeleteForm">
                             <span class="nameBlock"><span class="name">{% if not reply.post_user or reply.post_user == 'Anonymous' %}Anon{% else %}{{ reply.post_user | safe }}{% endif %}</span></span>
-                            <span class="postDate">{{ reply.date_display }}</span>  {# Форматированная дата #}
+                            <span class="postDate" data-iso-date="{{ reply.post_date }}">{{ reply.date_display }}</span>&nbsp;
                             <a href="/{{ board_id }}/thread/{{ post.post_id }}#{{ reply.reply_id }}" class="postLink">No.</a> {# Ссылка на тред + якорь ответа #}
                             <a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ reply.reply_id }}">{{ reply.reply_id }}</a> {# ID для цитирования #}
                             {# Включаем опции модерации для ответа #}
@@ -122,11 +126,7 @@
                     </div> {# Конец div.reply #}
                     {% endfor %} {# Конец цикла по последним ответам #}
 					
-                    {% if hidden_replies_count > 0 %}
-                    <div class="hidden-replies">
-                        <span>{{ hidden_replies_count }} {{ lang.get('hidden-replies', 'hidden replies.') }} <a href="/{{ board_id }}/thread/{{ post.post_id }}">Click here to view.</a></span>
-                    </div>
-                    {% endif %}					
+					
 					
 					
                 </div> {# Конец div.replies #}

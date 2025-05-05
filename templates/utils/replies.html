@@ -8,7 +8,7 @@
         <div class="postInfo">
             <input id="togglemodoptions_post_{{ post.post_id }}" type="checkbox" class="deletionCheckBox" value="{{ post.post_id }}" form="banDeleteForm">
             <span class="nameBlock"><span class="name">{% if not post.post_user or post.post_user == 'Anonymous' %}Anon{% else %}{{ post.post_user | safe }}{% endif %}</span> </span> 
-            <span class="postDate" data-iso-date="{{ post.post_date }}">{{ post.date_display }}</span> 
+            <span class="postDate" data-iso-date="{{ post.post_date }}">{{ post.date_display }}</span>&nbsp; 
 			<a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No.</a> <a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ post.post_id }}">{{ post.post_id }}</a>{% include 'utils/thread-moderation-options.html' %}
         </div>
         <div class="post_content_container">

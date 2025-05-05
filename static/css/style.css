@@ -1107,9 +1107,7 @@ img#post_video_thumbnail {
 .reply {
   display: flex;
   flex-wrap: wrap;
-  max-width: 40em;
-  min-width: 100%;
-  width: fit-content;
+  width: min(80vw, 100%);
   flex: 0 0 auto;
   color: var(--cor-texto);
   background-color: var(--cor-fundo-claro);
