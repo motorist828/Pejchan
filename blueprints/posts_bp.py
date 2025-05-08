@@ -57,6 +57,10 @@ class PostHandler:
     ban_manager = moderation_module.BanManager()
 
     def __init__(self, socketio, user_ip, post_mode, post_name, board_id, comment, embed, captcha_input):
+        if socketio is None:
+            logger.error("!!! PostHandler received socketio as None !!!")
+        else:
+            logger.info("--- PostHandler initialized with a valid socketio instance ---")
         self.socketio = socketio
         self.user_ip = user_ip
         self.post_mode = post_mode # "post" or "reply"
@@ -70,6 +74,7 @@ class PostHandler:
         self.comment = formatting.format_comment(comment)
         self.embed = embed # Embed URL (ensure validated/sanitized in route if needed)
         self.captcha_input = captcha_input
+        self.embed = embed
 
     def check_banned(self):
         """Checks if the user's IP is banned using the BanManager."""
@@ -365,8 +370,16 @@ class PostHandler:
 
         return processed_files_info # Return list (possibly empty)
 
+
+
+
+
+
     def handle_reply(self, reply_to_thread_id):
-        """Handles creating a reply entry in the database and emitting socket event."""
+        """
+        Handles creating a reply entry in the database and emitting socket event.
+        Skips applying the standard timeout if self.embed contains the PASSCODE.
+        """
         # Ensure reply_to_thread_id is an integer
         try:
             tid = int(reply_to_thread_id)
@@ -419,7 +432,7 @@ class PostHandler:
             tid, # Pass the integer thread ID
             self.post_name, # Raw name (DB function applies tripcode)
             self.comment, # Formatted comment
-            self.embed,
+            self.embed, # Pass embed to DB (if the table schema includes it)
             original_filenames, # List of original names
             thumbnail_rel_paths # List of relative thumb paths (e.g., 'reply_images/thumbs/thumb_xyz.jpg')
         )
@@ -455,20 +468,33 @@ class PostHandler:
                         'date': now_display,
                         'board': self.board_id
                     }
-                }, broadcast=True)
+                })
                 logger.info(f"SocketIO 'nova_postagem' (New Reply) emitted for reply {new_reply_id}")
 
             except Exception as socket_err:
                  # Log error but don't fail the whole operation if socket fails
                  logger.error(f"Failed to emit SocketIO event for reply {new_reply_id}: {socket_err}", exc_info=True)
 
-            # Apply timeout AFTER successful post and emit attempt
-            self.timeout_manager.apply_timeout(self.user_ip, duration_seconds=35, reason="Automatic timeout after reply.")
-            return True
+            # --- Apply timeout conditionally based on embed field ---
+            PASSCODE = "passcode" # Define the passcode (consider moving to config)
+
+            # Apply timeout ONLY if embed does not contain the passcode
+            if self.embed != PASSCODE:
+                self.timeout_manager.apply_timeout(self.user_ip, duration_seconds=35, reason="Automatic timeout after reply.")
+                logger.info(f"Timeout applied for IP {self.user_ip} after reply {new_reply_id}.")
+            else:
+                # Timeout skipped due to passcode
+                logger.info(f"Timeout skipped for IP {self.user_ip} due to passcode in reply {new_reply_id}.")
+            # --- End of conditional timeout ---
+
+            return True # Reply successfully created
         else:
             # DB insertion failed (error logged in database_module)
             flash("Failed to save reply to the database.", "error")
             return False
+
+
+	
 
     def handle_post(self):
         """Handles creating a new thread entry in the database and emitting socket event."""
@@ -544,7 +570,7 @@ class PostHandler:
                         'board': self.board_id,
                         # 'role': 'user' # Could add user role if needed by frontend
                     }
-                }, broadcast=True)
+                })
                 logger.info(f"SocketIO 'nova_postagem' (New Thread) emitted for post {new_post_id}")
 
             except Exception as socket_err:
@@ -568,6 +594,8 @@ def new_post():
         logger.error("SocketIO instance not found in Flask app extensions!")
         flash("A server configuration error occurred (SocketIO).", "error")
         return redirect(request.referrer or url_for('boards.main_page')) # Redirect back
+    else:
+        logger.info("--- SocketIO instance obtained successfully in /new_post ---")
 
     # Get user IP (handle proxies)
     user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)

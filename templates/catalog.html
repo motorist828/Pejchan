@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="{{ lang['html-lang'] | default('en') }}"> {# Используем язык из lang #}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {# Рассмотрите возможность скачивания и локального хостинга библиотек для лучшей производительности и приватности #}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {# Используем board_info для заголовка #}
+    <title>/{{ board_info.board_uri }}/ - {{ board_info.board_name }} - {{ lang["catalog-title"] | default("Catalog") }}</title>
+</head>
+<body>
+    {% include 'utils/navbar.html' %}
+    <div class="page-content">
+        {# Баннер доски #}
+        {% if board_banner %}
+        <div class="chan-banner">
+            <img class="banner board_banner" draggable="false" src="{{ board_banner }}" alt="Board Banner">
+        </div>
+        {% endif %}
+
+        {# Заголовок доски #}
+        <h1 class="board-title">
+             <a href="{{ url_for('boards.board_page', board_uri=board_info.board_uri) }}">/{{ board_info.board_uri }}/ - {{ board_info.board_name }}</a>
+             <span class="catalog-label">[{{ lang["catalog-title"] | default("Catalog") }}]</span>
+        </h1>
+
+        {# Форма создания треда (если нужна в каталоге) #}
+        {# Убедитесь, что captcha_image передается, если форма включена #}
+        {% include 'utils/threadform.html' %}
+
+        {# Контейнер каталога #}
+        <div class="catalog-container">
+            {# Сначала отображаем закрепленные посты (если они есть) #}
+            {% if pinneds %}
+                <h2 class="catalog-section-title">{{ lang['pinned-threads-title'] | default('Pinned Threads') }}</h2>
+                <div class="catalog-grid pinned-grid"> {# Отдельная сетка для пинов? #}
+                    {% for post in pinneds %} {# Используем переменную pinneds #}
+                        {% include 'utils/catalog_post_item.html' %} {# Выносим элемент в инклуд для чистоты #}
+                    {% endfor %}
+                </div>
+                <hr class="catalog-separator"> {# Разделитель #}
+                <h2 class="catalog-section-title">{{ lang['regular-threads-title'] | default('Threads') }}</h2>
+            {% endif %}
+
+            {# Отображаем обычные посты #}
+            <div class="catalog-grid"> {# Основная сетка #}
+                {% for post in posts %} {# Используем переменную posts #}
+                    {% include 'utils/catalog_post_item.html' %} {# Используем тот же инклуд #}
+                {% else %}
+                    <p class="no-threads-message">{{ lang['catalog-no-threads'] | default('No threads found on this board yet.') }}</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Предупреждения и прочее #}
+        {% include 'utils/waring-container.html' %} {# Проверьте имя файла #}
+    </div>
+
+    {# Рейнран? #}
+    <div id="reinrun"></div>
+
+    {% include 'utils/footer.html' %}
+
+    {# Скрипты #}
+    <script src="{{ url_for('static', filename='js/postform.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/thumb.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/boardstyle.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/flash.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mediascript.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/thread.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/socket.js') }}"></script>
+    {# jQuery уже подключен выше, второй раз не нужен #}
+    {# <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script> #}
+</body>
+</html>

@@ -9,7 +9,7 @@
                     <th>{{ lang.get("board-list-boarddesc", "Description") }}</th>
                     <th>{{ lang.get("board-list-threads", "Threads") }}</th> {# Заголовок для количества тредов #}
                     <th>{{ lang.get("board-list-replies", "Replies") }}</th> {# Заголовок для количества ответов #}
-                    <th>{{ lang.get("board-list-total", "Total") }}</th>   {# Заголовок для общего количества #}
+                    {# ----<th>{{ lang.get("board-list-total", "Total") }}</th> ---- #}  {# Заголовок для общего количества #}
                 </tr>
             </thead>
             <tbody>
@@ -28,7 +28,7 @@
                     {# Количество ответов (из словаря reply_counts) #}
                     <td>{{ reply_counts.get(board.get('board_uri'), 0) }}</td>
                     {# Общее количество постов (из данных доски) #}
-                    <td>{{ board.get('total_posts', 0) }}</td>
+                    {# ----<td>{{ board.get('total_posts', 0) }}</td>---- #}
                 </tr>
                 {# Блок 'else' выполнится, если список 'boards' пуст #}
                 {% else %}

@@ -362,6 +362,84 @@ def board_page(board_uri):
         return render_template('errors/500.html', error_message=f"Could not load board /{board_uri}/."), 500
 
 
+# board page endpoint for catalog view
+@boards_bp.route('/<board_uri>/catalog')
+def board_catalog(board_uri):
+    try:
+        # 1. Проверка существования доски и получение информации о ней
+        board_info_raw = database_module.get_board_info(board_uri)
+        if not board_info_raw:
+            logger.warning(f"Board not found for catalog request: /{board_uri}/")
+            flash(f"Board '/{board_uri}/' does not exist.", "error")
+            return redirect(url_for('boards.main_page'))
+        
+        board_info = dict(board_info_raw) # Преобразуем Row в dict
+
+        # 2. Загрузка постов (не закрепленных) для каталога
+        # Для каталога обычно нужен большой лимит или все посты
+        # Установим очень большой лимит, чтобы имитировать "все посты" для каталога
+        # В реальном приложении здесь могла бы быть отдельная функция "get_all_posts_for_catalog"
+        catalog_posts_limit = 200 # Пример: показать до 200 постов в каталоге
+        posts_raw = database_module.get_posts_for_board(board_uri, offset=0, limit=catalog_posts_limit)
+        
+        # 3. Закрепленные посты
+        pinneds_raw = database_module.get_pinned_posts(board_uri)
+        
+        # 4. Получение баннера (работает с файловой системой)
+        board_banner = database_module.get_board_banner(board_uri)
+        
+        # 5. Генерация CAPTCHA
+        captcha_text, captcha_image = database_module.generate_captcha()
+        session['captcha_text'] = captcha_text
+        
+        # 6. Получение ответов для видимых постов (и закрепленных, и обычных)
+        # В каталоге обычно показывают только ОП или ОП с небольшим количеством последних ответов.
+        # Текущая логика загружает ВСЕ ответы для ВСЕХ постов на странице, что может быть избыточно для каталога.
+        # Для каталога, возможно, ответы не нужны или нужны только для предпросмотра.
+        # Если ответы нужны:
+        visible_post_ids = [p['post_id'] for p in posts_raw] + [p['post_id'] for p in pinneds_raw]
+        replies_raw = []
+        if visible_post_ids:
+            try:
+                replies_raw = database_module.get_replies_for_posts(visible_post_ids)
+                # Для каталога можно ограничить количество ответов на пост, если нужно
+                # Например, взять только 3 последних ответа для каждого поста
+                # Это потребует дополнительной логики или изменения get_replies_for_posts
+            except Exception as db_err:
+                 logger.error(f"Error fetching replies for board catalog /{board_uri}/: {db_err}", exc_info=True)
+        
+        # 7. Роли пользователя
+        roles = 'none'
+        if 'username' in session:
+            roles = database_module.get_user_role(session["username"]) or 'none'
+
+        # 8. Форматирование данных для шаблона
+        # Используем ту же вспомогательную функцию format_content_for_template
+        posts_formatted = format_content_for_template(posts_raw)
+        pinneds_formatted = format_content_for_template(pinneds_raw)
+        replies_formatted = format_content_for_template(replies_raw) # Форматируем ответы, если они загружены
+
+        return render_template(
+            'catalog.html', # Убедитесь, что шаблон называется catalog.html
+            board_info=board_info,
+            captcha_image=captcha_image, # Для формы постинга из каталога?
+            roles=roles,
+            pinneds=pinneds_formatted,
+            posts=posts_formatted,
+            replies=replies_formatted, # Передаем отформатированные ответы
+            board_banner=board_banner,
+            board_id=board_uri # Используем board_uri, но передаем как board_id для совместимости с шаблоном
+        )
+
+    except Exception as e:
+        logger.error(f"Error loading board catalog for /{board_uri}/: {e}", exc_info=True)
+        # Можно отрендерить страницу с ошибкой или перенаправить
+        flash("An error occurred while loading the board catalog.", "error")
+        return render_template('errors/500.html', error_message=f"Could not load catalog for board /{board_uri}/."), 500
+
+
+
+
 # board banners page route.
 @boards_bp.route('/<board_uri>/banners')
 def board_banners(board_uri):
