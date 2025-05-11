@@ -133,6 +133,58 @@ def register():
     return redirect(url_for('boards.register'))
 
 
+@auth_bp.route('/set_user_mod_role', methods=['POST'])
+def set_user_mod_role():
+    """Устанавливает или снимает роль 'mod' с пользователя."""
+    # 1. Проверка, залогинен ли пользователь и является ли он владельцем
+    if 'username' not in session:
+        flash('You must be logged in.', 'warning')
+        return redirect(url_for('boards.login'))
+
+    current_user_role = database_module.get_user_role(session["username"])
+    if not current_user_role or 'owner' not in current_user_role.lower():
+        flash('You do not have permission to manage user roles.', 'error')
+        logger.warning(f"User '{session['username']}' (role: {current_user_role}) "
+                       f"attempted to manage roles without owner permission.")
+        return redirect(url_for('boards.login')) # Редирект на дашборд
+
+    # 2. Получаем данные из формы
+    target_username = request.form.get('target_username')
+    action = request.form.get('action') # 'set_mod' или 'remove_mod'
+
+    if not target_username or not action:
+        flash('Missing target user or action.', 'error')
+        return redirect(url_for('boards.login') + '#user-management') # На якорь секции
+
+    # Нельзя изменять свою собственную роль через этот интерфейс
+    if target_username == session["username"]:
+        flash('You cannot change your own role through this interface.', 'warning')
+        return redirect(url_for('boards.login') + '#user-management')
+
+    # 3. Определяем новую роль
+    new_role_to_set = None
+    if action == 'set_mod':
+        new_role_to_set = 'mod'
+    elif action == 'remove_mod':
+        new_role_to_set = 'user' # Снятие роли 'mod' возвращает к роли 'user'
+    else:
+        flash('Invalid action specified.', 'error')
+        return redirect(url_for('boards.login') + '#user-management')
+
+    # 4. Вызываем функцию из database_module
+    if database_module.set_user_role(target_username, new_role_to_set):
+        role_action_text = "assigned as moderator" if new_role_to_set == 'mod' else "had moderator role removed"
+        flash(f"User '{target_username}' has been successfully {role_action_text}.", 'success')
+        logger.info(f"Owner '{session['username']}' changed role of '{target_username}' to '{new_role_to_set}'.")
+    else:
+        # Сообщение об ошибке могло быть установлено в set_user_role или здесь
+        flash(f"Failed to update role for user '{target_username}'. "
+              f"They might be the owner or an error occurred.", 'error')
+
+    return redirect(url_for('boards.login') + '#user-management') # Редирект на якорь
+
+
+
 @auth_bp.route('/create_board', methods=['POST'])
 def create_board():
     """Обрабатывает создание новой доски."""
@@ -495,17 +547,30 @@ def delete_reply(reply_id):
     return redirect(request.referrer or url_for('boards.board_page', board_uri=board_uri_to_redirect))
 
 
-@auth_bp.route('/ban_user/<post_id>', methods=['POST'])
-def ban_user(post_id):
-    """Банит пользователя по IP адресу поста/ответа (владелец сайта/модератор)."""
+@auth_bp.route('/ban_user_generic', methods=['POST'])
+def ban_user_generic():
+    """
+    Банит пользователя по IP адресу, связанному с ID контента.
+    Принимает ID контента, длительность и причину из формы.
+    Пока реализует только глобальный IP-бан.
+    """
     if 'username' not in session:
         flash('You must be logged in.', 'warning')
+        # Можно редиректить на referrer, если он есть, или на главную
         return redirect(request.referrer or url_for('boards.main_page'))
 
+    # Получаем данные из формы
+    content_id_str = request.form.get('content_id')
+    ban_duration_str = request.form.get('ban_duration') # Например, "86400" или "0" (для Perm)
+    ban_reason = request.form.get('ban_reason', 'No reason provided.').strip()
+    # ban_scope_board_uri = request.form.get('ban_scope_board_uri', 'all_boards') # Пока не используем
+
+    # Валидация content_id
     try:
-        content_id = int(post_id) # Это может быть ID поста или ответа
-    except ValueError:
+        content_id = int(content_id_str)
+    except (ValueError, TypeError):
         flash('Invalid content ID for banning.', 'error')
+        logger.warning(f"Ban attempt with invalid content_id: {content_id_str}")
         return redirect(request.referrer or url_for('boards.main_page'))
 
     # --- Проверка прав на бан ---
@@ -518,34 +583,98 @@ def ban_user(post_id):
 
     if not can_ban:
         flash("You don't have permission to ban users.", 'error')
+        logger.warning(f"User '{current_user}' (roles: {user_roles}) attempted to ban without permission.")
         return redirect(request.referrer or url_for('boards.main_page'))
 
-    # --- Получение IP и выполнение бана ---
+    # --- Получение IP для бана ---
     user_ip_to_ban = database_module.get_post_ip(content_id)
 
-    if user_ip_to_ban:
-        ban_manager = moderation_module.BanManager()
-        reason = request.form.get('ban_reason', 'No reason provided.') # Можно добавить поле для причины в форму
-        duration_str = request.form.get('ban_duration') # Поле для длительности (например, в секундах или 'permanent')
-
-        duration_seconds = None # По умолчанию - перманентный
-        if duration_str and duration_str.isdigit():
-            duration_seconds = int(duration_str)
-        elif duration_str == 'permanent':
-             duration_seconds = None
-
-        # Баним пользователя
-        if ban_manager.ban_user(user_ip_to_ban, duration_seconds=duration_seconds, reason=reason, moderator=current_user):
-            flash(f'The user with IP {user_ip_to_ban} has been banned. Reason: {reason}', 'success')
-            logger.info(f"User '{current_user}' banned IP {user_ip_to_ban} (from content ID {content_id}). Reason: {reason}, Duration(s): {duration_seconds}")
-        else:
-             # Ошибка в ban_user (маловероятно, если IP есть)
-             flash('An error occurred while trying to ban the user.', 'error')
-    else:
-        # IP не найден для данного ID (пост/ответ удален?)
+    if not user_ip_to_ban:
         flash('Could not find the user IP associated with this content to ban.', 'error')
+        logger.warning(f"Could not find IP for content_id {content_id} to ban.")
+        return redirect(request.referrer or url_for('boards.main_page'))
 
+    # --- Определение длительности бана ---
+    duration_seconds = None # По умолчанию - перманентный
+    if ban_duration_str:
+        if ban_duration_str.isdigit():
+            val = int(ban_duration_str)
+            if val > 0: # Если 0, то это наш маркер для перманентного
+                duration_seconds = val
+            # Если val == 0, duration_seconds остается None (перманентный)
+        elif ban_duration_str.lower() == 'perm': # Дополнительная проверка, если бы value было 'Perm'
+             duration_seconds = None
+        else:
+            flash('Invalid ban duration specified.', 'warning')
+            logger.warning(f"Invalid ban_duration_str: {ban_duration_str}")
+            return redirect(request.referrer or url_for('boards.main_page'))
+
+
+    # --- Выполнение бана (пока только глобальный IP-бан) ---
+    # if ban_scope_board_uri == 'all_boards':
+    ban_manager = moderation_module.BanManager()
+    if ban_manager.ban_user(user_ip_to_ban, duration_seconds=duration_seconds, reason=ban_reason, moderator=current_user):
+        duration_text = f"{duration_seconds // 3600}h" if duration_seconds and duration_seconds >= 3600 else (f"{duration_seconds // 60}m" if duration_seconds and duration_seconds >= 60 else (f"{duration_seconds}s" if duration_seconds else "Permanent"))
+        flash(f'User with IP {user_ip_to_ban} has been banned. Duration: {duration_text}. Reason: {ban_reason}', 'success')
+        logger.info(f"User '{current_user}' banned IP {user_ip_to_ban} (from content ID {content_id}). Duration: {duration_text}. Reason: {ban_reason}")
+    else:
+         flash('An error occurred while trying to ban the user.', 'error')
+         logger.error(f"ban_manager.ban_user returned false for IP {user_ip_to_ban}")
+    # else:
+    #     # TODO: Реализовать логику бана на конкретной доске
+    #     flash(f'Board-specific ban for {user_ip_to_ban} on /{ban_scope_board_uri}/ is not yet implemented.', 'info')
+    #     logger.info(f"User '{current_user}' attempted board-specific ban for IP {user_ip_to_ban} on board '{ban_scope_board_uri}'. Not implemented.")
+
+
+    # Редирект обратно на предыдущую страницу
+    # Важно: request.referrer может быть страницей с открытым диалогом.
+    # Возможно, лучше редиректить на страницу доски/треда, откуда был вызван бан.
+    # Для этого нужно передать исходный URL или board_uri/thread_id в форме бана.
+    # Пока оставим referrer.
     return redirect(request.referrer or url_for('boards.main_page'))
+
+
+# auth_bp.py
+
+# ... (импорты) ...
+
+# ... (другие маршруты) ...
+
+@auth_bp.route('/unban_user_ip', methods=['POST'])
+def unban_user_ip():
+    """Снимает бан с указанного IP-адреса."""
+    if 'username' not in session:
+        flash('You must be logged in.', 'warning')
+        return redirect(url_for('boards.login')) # Или на главную
+
+    # --- Проверка прав на разбан ---
+    user_roles = database_module.get_user_role(session["username"])
+    can_unban = False
+    if user_roles and ('owner' in user_roles.lower() or 'mod' in user_roles.lower()):
+        can_unban = True
+
+    if not can_unban:
+        flash("You don't have permission to unban users.", 'error')
+        return redirect(url_for('boards.login')) # Редирект на дашборд
+
+    # Получаем IP для разбана из формы
+    ip_to_unban = request.form.get('user_ip')
+    if not ip_to_unban:
+        flash("No IP address provided for unbanning.", "warning")
+        return redirect(url_for('boards.login')) # Редирект на дашборд
+
+    # --- Выполнение разбана ---
+    ban_manager = moderation_module.BanManager()
+    if ban_manager.unban_user(ip_to_unban):
+        flash(f"Ban for IP address {ip_to_unban} has been lifted.", "success")
+        logger.info(f"User '{session['username']}' unbanned IP {ip_to_unban}.")
+    else:
+        # unban_user мог вернуть False, если IP не был забанен или ошибка БД
+        flash(f"Failed to lift ban for IP {ip_to_unban}. The IP might not be banned or a database error occurred.", "warning")
+
+    # Редирект обратно на дашборд, в секцию модерации
+    return redirect(url_for('boards.login') + '#mod-tools') # Добавляем якорь к секции
+
 
 
 @auth_bp.route('/logout')

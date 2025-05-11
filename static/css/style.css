@@ -845,6 +845,10 @@ input[type=button], input[type=file], input[type=number], input[type=password], 
     border-color: var(--cor-primaria) !important;
 }
 
+.file-preview-name {
+	color: var(--cor-primaria);
+}
+
 .postform-style.dummy-link, input[type=submit] {
   min-height: 2.5em; /* Keep original size */
   cursor: pointer;
@@ -987,7 +991,9 @@ input[type=submit]:hover {
   flex-direction: column;
   align-items: flex-start;
   margin-right: 0.8em;
-  width: -webkit-fill-available;
+  width: 100%; /* Фолбэк */
+  width: -moz-available; /* Firefox */
+  width: -webkit-fill-available; /* Chrome, Safari */
   justify-content: flex-start;
   left: 0;
 }
@@ -1827,4 +1833,172 @@ img#post_video_thumbnail {
 }
 .media-modal .media-content-wrapper > [style*="cursor: grabbing"] {
     cursor: grabbing !important;
+}
+
+
+
+dialog.ban_post_popup:not([open]) { /* Применяется, когда диалог НЕ открыт */
+  display: none;
+}
+
+dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.7); /* Более темный фон, как у многих модалок */
+  backdrop-filter: blur(2px); /* Легкое размытие фона (опционально) */
+}
+
+.ban_post_popup {
+  position: fixed; /* Остается fixed */
+  /* top, left, right, bottom, margin: auto - для центрирования */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); /* Точное центрирование */
+
+  width: 90%; /* Адаптивная ширина для мобильных */
+  max-width: 30em; /* Максимальная ширина */
+  height: fit-content; /* Высота по содержимому */
+
+  background-color: var(--cor-fundo-claro); /* Основной фон элементов */
+  border: 1px solid var(--cor-borda); /* Рамка, как у постов */
+  border-radius: var(--border-radius-md); /* Скругление углов */
+  box-shadow: var(--shadow-dark-md); /* Тень */
+
+  padding: 1.5em; /* Внутренние отступы */
+  color: var(--cor-texto); /* Основной цвет текста */
+
+  display: flex; /* Включаем flex для удобного расположения дочерних элементов */
+  flex-direction: column;
+  gap: 1.5em; /* Пространство между основными блоками диалога */
+
+  outline: none; /* Убираем стандартный outline при фокусе */
+  overflow: hidden; /* Если содержимое будет слишком большим (хотя height: fit-content) */
+}
+
+.ban_post_popup .dialog_header { /* Используем dialog_header из вашего HTML */
+  display: flex;
+  justify-content: space-between; /* Располагаем заголовок и кнопку закрытия по краям */
+  align-items: center;
+  width: 100%;
+  padding-bottom: 1em; /* Отступ снизу от заголовка */
+  border-bottom: 1px solid var(--cor-borda-claro); /* Разделитель */
+  margin-bottom: 0.5em; /* Небольшой отступ после разделителя */
+}
+
+.ban_post_popup .dialog_header h2 { /* Стиль для h2, как в HTML */
+  margin: 0;
+  font-size: 1.2em; /* Размер заголовка */
+  font-weight: 600; /* Полужирный шрифт */
+  color: var(--cor-texto);
+}
+
+.ban_post_popup .close-dialog-btn { /* Кнопка закрытия */
+  background: none;
+  border: none;
+  color: var(--cor-terciaria);
+  font-size: 1.5em;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0.2em 0.5em;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+.ban_post_popup .close-dialog-btn:hover {
+  color: var(--cor-erro); /* Цвет ошибки при наведении */
+}
+
+.ban_post_popup form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5em; /* Увеличим немного отступ между элементами формы */
+  width: 100%;
+}
+
+/* Стили для общих секций внутри формы */
+.ban_post_popup .form_section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em; /* Отступ между заголовком секции и элементом */
+}
+
+.ban_post_popup .form_section h3 {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--cor-terciaria); /* Менее яркий цвет для подзаголовков */
+  margin: 0 0 0.3em 0;
+  text-transform: uppercase; /* Заглавные буквы для подзаголовков */
+  letter-spacing: 0.5px;
+}
+
+/* Стили для input, select (наследуются из общих, но можно переопределить) */
+.ban_post_popup input[type="text"],
+.ban_post_popup select {
+  width: 100%; /* Занимают всю доступную ширину */
+  box-sizing: border-box; /* Чтобы padding не увеличивал общую ширину */
+  background-color: var(--cor-fundo); /* Чуть темнее фона диалога */
+  border-color: var(--cor-borda-claro);
+}
+.ban_post_popup input[type="text"]:focus,
+.ban_post_popup select:focus {
+  border-color: var(--cor-primaria); /* Подсветка при фокусе */
+  box-shadow: 0 0 0 2px rgba(var(--cor-primaria-rgb), 0.2);
+}
+
+
+/* Стили для выбора доски (если будет использоваться) */
+.ban_post_popup .board_ban_selector {
+  /* Уже есть display: flex; flex-direction: column; */
+  /* font-size: 0.8em; /* Немного уменьшим шрифт для этого блока, если нужно */
+}
+
+
+/* Стили для кнопок выбора времени бана */
+.ban_post_popup .ban_times ul {
+  display: flex;
+  flex-wrap: wrap; /* Позволяем переноситься на новую строку */
+  align-items: center;
+  justify-content: center; /* Или space-around для равномерного распределения */
+  gap: 0.8em; /* Отступы между кнопками */
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.ban_post_popup .ban_times ul button {
+  font-family: var(--font-sans); /* Используем основной шрифт */
+  background-color: var(--cor-fundo); /* Фон кнопок */
+  color: var(--cor-secundaria); /* Цвет текста кнопок */
+  border: 1px solid var(--cor-borda-claro); /* Рамка */
+  border-radius: var(--border-radius-sm); /* Скругление */
+  padding: 0.5em 1em; /* Отступы внутри кнопок */
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+}
+
+.ban_post_popup .ban_times ul button:hover {
+  background-color: var(--cor-primaria); /* Основной цвет при наведении */
+  color: white;
+  border-color: var(--cor-primaria);
+  transform: translateY(-1px);
+}
+.ban_post_popup .ban_times ul button:active {
+  transform: translateY(0px); /* Эффект нажатия */
+}
+
+/* Опционально: стиль для перманентного бана, чтобы выделить */
+.ban_post_popup .ban_times ul button[value="0"] { /* Или value="Perm" */
+  background-color: var(--cor-erro); /* Цвет ошибки для перманентного бана */
+  color: white;
+  border-color: var(--cor-erro);
+}
+.ban_post_popup .ban_times ul button[value="0"]:hover {
+  background-color: rgba(244, 63, 94, 0.8); /* Немного темнее при наведении */
+  border-color: rgba(244, 63, 94, 0.8);
+}
+
+
+/* Удаление лишних стилей (если они были в предыдущем CSS для popup) */
+.ban_post_popup .remove_all_ip_posts {
+  /* Если этот блок не используется, его можно удалить из HTML или скрыть */
+  display: none;
 }

@@ -22,9 +22,10 @@
         <h1 class="board-title">/{{ board_info.board_uri }}/ - {{ board_info.board_name }}</h1>
         
         {% include 'utils/board-options-container.html' %}
-		{% include 'utils/threadform.html' %}
+	{% include 'utils/threadform.html' %}
         {% include 'utils/pinned_posts.html' %}
         {% include 'utils/board_posts.html' %}
+        {% include 'utils/popup-ban.html' %}
         {% include 'utils/board_pagination.html' %}
         {% include 'utils/waring-container.html' %}
 		

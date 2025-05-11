@@ -486,13 +486,6 @@ input.deletionCheckBox:checked ~ .reply-postInfo .mod-options { display: inline-
 .paginate-posts a { color: var(--color-primary); font-size: 1.2rem; line-height: 1; text-decoration: none; }
 .paginate-posts a:hover { color: #60a5fa; }
 .paginate-posts i[style*="color: #bfbfbf"] { color: var(--color-text-subtle) !important; cursor: not-allowed; opacity: 0.5; }
-.page-item.active .page-link {
-  z-index: 3; /* Выше всех */
-  color: #fff; /* Белый текст */
-  background-color: #60a5fa; /* Основной цвет сайта (например, синий) */
-  border-color: #60a5fa; /* Цвет рамки совпадает с фоном */
-  cursor: default; /* Курсор по умолчанию, т.к. это текущая страница */
-}
 
 .board_banners_container { display: flex; flex-wrap: wrap; gap: var(--space-md); justify-content: center; margin-top: var(--space-lg); padding: var(--space-md); background-color: var(--color-background-alt); border: var(--border-width) solid var(--color-border); border-radius: var(--border-radius-lg); }
 .board_banners_container p { color: var(--color-text-subtle); width: 100%; text-align: center; }

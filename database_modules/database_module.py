@@ -369,6 +369,66 @@ def get_user_role(username):
     user = get_user_by_username(username)
     return user['role'] if user else None
 
+
+def get_all_users_with_roles(exclude_username=None):
+    """
+    Получает список всех пользователей и их роли.
+    Опционально исключает указанного пользователя из списка.
+    """
+    params = []
+    sql = "SELECT id, username, role FROM accounts"
+    if exclude_username:
+        sql += " WHERE username != ?"
+        params.append(exclude_username)
+    sql += " ORDER BY username"
+
+    users_raw = execute_query(sql, tuple(params), fetchall=True)
+    if not users_raw:
+        return []
+    # Конвертируем в список словарей
+    return [dict(user) for user in users_raw]
+
+
+def set_user_role(target_username, new_role):
+    """
+    Устанавливает новую роль для указанного пользователя.
+    Роль 'owner' может быть только одна, и владелец не может быть разжалован этой функцией.
+    """
+    # Проверка, что new_role допустима (например, 'mod', 'user', или пустая строка для снятия модераторства)
+    allowed_roles_to_set = ['mod', 'user', ''] # Пустая строка будет означать стандартную роль 'user'
+    if new_role not in allowed_roles_to_set and new_role is not None : # None может быть если роль снимается
+        logger.error(f"Попытка установить недопустимую роль '{new_role}' для пользователя '{target_username}'.")
+        return False
+
+    target_user = get_user_by_username(target_username)
+    if not target_user:
+        logger.warning(f"Не удалось изменить роль: пользователь '{target_username}' не найден.")
+        return False
+
+    # Владелец не может быть изменен этой функцией или понижен до не-владельца
+    if target_user['role'] == 'owner':
+        logger.warning(f"Попытка изменить роль владельца '{target_username}' через set_user_role. Отклонено.")
+        return False # Защита от случайного разжалования владельца
+
+    # Если new_role пустая строка или None, устанавливаем роль 'user' (или какая у вас базовая)
+    actual_new_role = new_role if new_role and new_role.strip() else 'user'
+
+    sql = "UPDATE accounts SET role = ? WHERE username = ?"
+    try:
+        # fetchall=False для UPDATE
+        result = execute_query(sql, (actual_new_role, target_username), commit=True, fetchall=False)
+        if result is not None: # Указывает, что запрос выполнился без ошибки SQLite
+            logger.info(f"Роль для пользователя '{target_username}' изменена на '{actual_new_role}'.")
+            return True
+        else:
+            # Ошибка уже залогирована в execute_query
+            return False
+    except Exception as e:
+        logger.error(f"Ошибка при изменении роли для '{target_username}': {e}", exc_info=True)
+        return False
+
+
+
 def get_post_ip(post_or_reply_id):
     try: pid = int(post_or_reply_id)
     except (ValueError, TypeError): logger.warning(f"Неверный ID для получения IP: {post_or_reply_id}"); return None

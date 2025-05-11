@@ -2,18 +2,20 @@
 
 # imports
 from flask import current_app, Blueprint, render_template, session, redirect, request, url_for, flash
-from database_modules import database_module
+# --- ВАЖНО: Убедитесь, что эти импорты есть ---
+from database_modules import database_module # <--- ОСНОВНОЙ ИМПОРТ
 from database_modules import language_module
+from database_modules import moderation_module # <--- Добавлен для дашборда (BanManager)
+# --- КОНЕЦ ВАЖНОЙ ЧАСТИ ---
 import logging
-import json # Required for handling JSON file lists if needed (though helpers are in db module)
-from datetime import datetime, timezone # For date handling if needed here
+import json
+from datetime import datetime, timezone # Для format_content_for_template и др.
 
 # Configure logging
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s') # Configured elsewhere potentially
-logger = logging.getLogger(__name__) # Use Flask's logger or configure one
+logger = logging.getLogger(__name__)
 
 # blueprint register.
-boards_bp = Blueprint('boards', __name__, template_folder='../templates', static_folder='../static') # Adjust paths if needed
+boards_bp = Blueprint('boards', __name__, template_folder='../templates', static_folder='../static')
 
 # load language.
 @boards_bp.context_processor
@@ -180,58 +182,74 @@ def tabuas():
 
 # account dashboard and login route.
 @boards_bp.route('/conta')
-def login():
+def login(): # Название маршрута login, но он же и дашборд
     if 'username' in session:
         try:
             username = session["username"]
             user_info = database_module.get_user_by_username(username)
             if not user_info:
-                 session.pop('username', None); session.pop('role', None)
+                 session.pop('username', None)
+                 session.pop('role', None)
                  flash("Your account could not be found. Please log in again.", "warning")
                  return redirect(url_for('boards.login'))
 
             roles = user_info['role']
             user_boards_raw = database_module.get_user_boards(username)
-            # Конвертируем Row в dict сразу, если это удобнее дальше
-            user_boards = [dict(board) for board in user_boards_raw]
+            user_boards = [dict(board) for board in user_boards_raw] if user_boards_raw else []
 
             all_posts_list_raw = database_module.get_all_posts_simple(sort_by_date=True)
             total_posts_count = len(all_posts_list_raw) if all_posts_list_raw else 0
             recent_dashboard_posts_raw = all_posts_list_raw[:10]
 
-            # --- Форматируем и добавляем информацию о владельце ---
             recent_dashboard_posts = []
-            board_owners_cache = {}
+            board_owners_cache = {} # Кэш: {board_uri: owner_username}
             if recent_dashboard_posts_raw:
                 # format_content_for_template возвращает список словарей
                 formatted_recent = format_content_for_template(recent_dashboard_posts_raw)
-                for post in formatted_recent: # post уже dict
-                    board_uri = post.get('board_uri') # Используем .get() для словаря post
+                for post_dict in formatted_recent: # post_dict теперь словарь
+                    board_uri_key = 'board_uri'
+                    board_uri = post_dict.get(board_uri_key)
+
                     if board_uri:
                         if board_uri not in board_owners_cache:
-                            # get_board_info возвращает sqlite3.Row или None
+                            # database_module.get_board_info возвращает sqlite3.Row или None
                             board_info_row = database_module.get_board_info(board_uri)
-                            # --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
                             if board_info_row:
-                                # Доступ по ключу к sqlite3.Row
+                                # Доступ к данным в sqlite3.Row по имени колонки (как к ключу словаря)
                                 board_owners_cache[board_uri] = board_info_row['board_owner']
                             else:
+                                # Если информация о доске не найдена
                                 board_owners_cache[board_uri] = None
-                            # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
                         # Добавляем закэшированное значение в словарь поста
-                        post['board_owner_info'] = board_owners_cache.get(board_uri)
+                        post_dict['board_owner_info'] = board_owners_cache.get(board_uri)
                     else:
-                        post['board_owner_info'] = None
-                    recent_dashboard_posts.append(post)
+                        post_dict['board_owner_info'] = None
+                    recent_dashboard_posts.append(post_dict)
+
+            # --- Получение списка активных банов для модераторов/владельцев ---
+            active_bans = []
+            # --- Получение списка пользователей для управления ролями (только для владельца) ---
+            manageable_users = []
+
+            if roles and ('owner' in roles.lower() or 'mod' in roles.lower()):
+                ban_manager = moderation_module.BanManager()
+                active_bans = ban_manager.get_active_bans()
+                
+                # Владелец может управлять ролями других пользователей
+                if 'owner' in roles.lower():
+                    # Исключаем самого владельца из списка, чтобы он не мог себя разжаловать
+                    manageable_users = database_module.get_all_users_with_roles(exclude_username=username)
 
             return render_template('dashboard.html',
                                    username=username,
                                    roles=roles,
                                    user_boards=user_boards,
                                    total_posts_count=total_posts_count,
-                                   recent_dashboard_posts=recent_dashboard_posts
+                                   recent_dashboard_posts=recent_dashboard_posts,
+                                   active_bans=active_bans,
+                                   manageable_users=manageable_users, # <--- ПЕРЕДАЕМ ПОЛЬЗОВАТЕЛЕЙ
+                                   all_boards=globalboards().get("boards", [])
                                   )
-
         except Exception as e:
             logger.error(f"Error loading dashboard for {session.get('username')}: {e}", exc_info=True)
             return render_template('errors/500.html', error_message="Could not load dashboard."), 500
@@ -255,17 +273,28 @@ def register():
 # board creation page route.
 @boards_bp.route('/create')
 def create():
-    if 'username' in session:
-        try:
-            captcha_text, captcha_image = database_module.generate_captcha()
-            session['captcha_text'] = captcha_text
-            return render_template('board-create.html', captcha_image=captcha_image)
-        except Exception as e:
-            logger.error(f"Error generating CAPTCHA for board creation: {e}", exc_info=True)
-            return render_template('errors/500.html', error_message="Could not load board creation page."), 500
-    else:
+    if 'username' not in session:
         flash("You must be logged in to create a board.", "warning")
         return redirect(url_for('boards.login'))
+
+    # --- ПРОВЕРКА РОЛИ ПОЛЬЗОВАТЕЛЯ ---
+    user_role = database_module.get_user_role(session["username"])
+    if not user_role or 'owner' not in user_role.lower():
+        flash("Only the site owner can create new boards.", "error")
+        logger.warning(f"User '{session['username']}' (role: {user_role}) "
+                       f"attempted to access board creation page without owner permission.")
+        # Редирект на дашборд или главную страницу
+        return redirect(url_for('boards.login')) # Если залогинен, попадет на дашборд
+    # --- КОНЕЦ ПРОВЕРКИ РОЛИ ---
+
+    # Если пользователь - владелец, продолжаем как обычно
+    try:
+        captcha_text, captcha_image = database_module.generate_captcha()
+        session['captcha_text'] = captcha_text
+        return render_template('board-create.html', captcha_image=captcha_image)
+    except Exception as e:
+        logger.error(f"Error generating CAPTCHA for board creation by owner '{session['username']}': {e}", exc_info=True)
+        return render_template('errors/500.html', error_message="Could not load board creation page."), 500
 
 # rules route page
 @boards_bp.route('/pages/globalrules.html')

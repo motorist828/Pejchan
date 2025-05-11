@@ -31,13 +31,10 @@
       </form>
 
       <!-- Ban Poster -->
-      <form action="/ban_user/{{ post.post_id }}" method="post" class="mod-action-form" 
-            onsubmit="return confirm('Are you sure you want to ban the author?');">
-        <input type="hidden" name="board_owner" value="{{ board_info.board_owner }}">
-        <button type="submit" class="mod-action-btn mod-action-delete" title="Ban this user">
-          <i class="fa-solid fa-ban" style="color: var(--cor-texto);"></i>
-        </button>
-      </form>
+<button type="button" class="mod-action-btn mod-action-ban" title="Ban this user"
+        onclick="openBanDialog('{{ post.post_id if post else reply.reply_id }}', '{{ board_info.board_uri }}')">
+    <i class="fa-solid fa-ban" style="color: var(--cor-texto);"></i>
+</button>
     </div>
   {% endif %}
 {% endif %}

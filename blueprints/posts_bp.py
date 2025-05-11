@@ -371,14 +371,11 @@ class PostHandler:
         return processed_files_info # Return list (possibly empty)
 
 
-
-
-
-
     def handle_reply(self, reply_to_thread_id):
         """
         Handles creating a reply entry in the database and emitting socket event.
         Skips applying the standard timeout if self.embed contains the PASSCODE.
+        Returns the ID of the new reply on success, None otherwise.
         """
         # Ensure reply_to_thread_id is an integer
         try:
@@ -386,17 +383,17 @@ class PostHandler:
         except (ValueError, TypeError):
              flash("Invalid thread ID format.", "error")
              logger.error(f"Invalid thread ID received in handle_reply: {reply_to_thread_id}")
-             return False
+             return None # MODIFIED
 
         # Check if thread exists (using the correct DB function)
         if not database_module.check_replyto_exist(tid):
             flash("This thread doesn't exist!", "error")
-            return False
+            return None # MODIFIED
 
         # Check if thread is locked
         if database_module.verify_locked_thread(tid):
             flash("This thread is locked.", "error")
-            return False
+            return None # MODIFIED
 
         # Validate CAPTCHA if required for the board
         if database_module.verify_board_captcha(self.board_id):
@@ -404,67 +401,58 @@ class PostHandler:
             if not session_captcha:
                  flash("CAPTCHA session expired. Please refresh.", "warning")
                  logger.warning("CAPTCHA check failed: session data missing.")
-                 return False
+                 return None # MODIFIED
             if not database_module.validate_captcha(self.captcha_input, session_captcha):
                 flash("Invalid captcha.", "error")
-                return False
+                return None # MODIFIED
 
         # Process uploaded files
         processed_files = self.process_uploaded_files(REPLY_IMAGE_FOLDER_REL, is_thread=False)
-        # process_uploaded_files returns list or None on critical error
-
+        
         if processed_files is None: # Critical error during file processing
-             # Flash message should be set within process_uploaded_files or helpers
-             return False
+             return None # MODIFIED
 
         # Check: need either text or *successfully processed* file
         if not self.comment and not processed_files:
             flash("You need to type something or successfully upload a file for a reply.", "error")
-            return False
+            return None # MODIFIED
 
         # --- Prepare data for DB ---
         original_filenames = [f['original'] for f in processed_files]
-        thumbnail_rel_paths = [f['thumbnail'] for f in processed_files] # Relative to static root
+        thumbnail_rel_paths = [f['thumbnail'] for f in processed_files] 
 
         # --- Add to Database ---
         new_reply_id = database_module.add_new_reply(
             self.user_ip,
-            tid, # Pass the integer thread ID
-            self.post_name, # Raw name (DB function applies tripcode)
-            self.comment, # Formatted comment
-            self.embed, # Pass embed to DB (if the table schema includes it)
-            original_filenames, # List of original names
-            thumbnail_rel_paths # List of relative thumb paths (e.g., 'reply_images/thumbs/thumb_xyz.jpg')
+            tid, 
+            self.post_name, 
+            self.comment, 
+            self.embed, 
+            original_filenames, 
+            thumbnail_rel_paths 
         )
 
         if new_reply_id:
-            # --- Emit SocketIO Event (if DB insert successful) ---
             try:
-                # Prepare data for socket emission
                 socket_files_data = []
                 for f_info in processed_files:
-                    # Construct full static URLs for socket data using url_for
-                    # Assumes 'static' endpoint is correctly configured
                     orig_url = url_for('static', filename=os.path.join(REPLY_IMAGE_FOLDER_REL, f_info['original'])).replace('\\', '/')
-                    # Thumbnail path is already relative to static root
                     thumb_url = url_for('static', filename=f_info['thumbnail']).replace('\\', '/')
                     socket_files_data.append({'original': orig_url, 'thumbnail': thumb_url})
 
-                # Get current time formatted for display
                 now_utc = datetime.now(timezone.utc)
                 now_display = database_module.format_datetime_for_display(now_utc)
-                # Generate tripcode *here* for socket emission consistency
                 display_name = database_module.generate_tripcode(self.post_name)
 
                 self.socketio.emit('nova_postagem', {
                     'type': 'New Reply',
                     'post': {
-                        'id': new_reply_id, # Actual ID of the new reply
-                        'reply_id': new_reply_id, # Include reply_id specifically if needed
+                        'id': new_reply_id, 
+                        'reply_id': new_reply_id, 
                         'thread_id': tid,
-                        'name': display_name, # Name with tripcode applied
-                        'content': self.comment, # Send formatted comment
-                        'files_data': socket_files_data, # Send URLs for display
+                        'name': display_name, 
+                        'content': self.comment, 
+                        'files_data': socket_files_data, 
                         'date': now_display,
                         'board': self.board_id
                     }
@@ -472,81 +460,64 @@ class PostHandler:
                 logger.info(f"SocketIO 'nova_postagem' (New Reply) emitted for reply {new_reply_id}")
 
             except Exception as socket_err:
-                 # Log error but don't fail the whole operation if socket fails
                  logger.error(f"Failed to emit SocketIO event for reply {new_reply_id}: {socket_err}", exc_info=True)
 
-            # --- Apply timeout conditionally based on embed field ---
-            PASSCODE = "passcode" # Define the passcode (consider moving to config)
-
-            # Apply timeout ONLY if embed does not contain the passcode
+            PASSCODE = "passcode" 
             if self.embed != PASSCODE:
                 self.timeout_manager.apply_timeout(self.user_ip, duration_seconds=35, reason="Automatic timeout after reply.")
                 logger.info(f"Timeout applied for IP {self.user_ip} after reply {new_reply_id}.")
             else:
-                # Timeout skipped due to passcode
                 logger.info(f"Timeout skipped for IP {self.user_ip} due to passcode in reply {new_reply_id}.")
-            # --- End of conditional timeout ---
-
-            return True # Reply successfully created
+            
+            return new_reply_id # MODIFIED: Return the new reply ID
         else:
-            # DB insertion failed (error logged in database_module)
             flash("Failed to save reply to the database.", "error")
-            return False
+            return None # MODIFIED: Return None on DB failure
 
-
-	
 
     def handle_post(self):
-        """Handles creating a new thread entry in the database and emitting socket event."""
-        # Validate CAPTCHA if required
+        """
+        Handles creating a new thread entry in the database and emitting socket event.
+        Returns the ID of the new post (thread OP) on success, None otherwise.
+        """
         if database_module.verify_board_captcha(self.board_id):
             session_captcha = session.get('captcha_text')
             if not session_captcha:
                  flash("CAPTCHA session expired. Please refresh.", "warning")
                  logger.warning("CAPTCHA check failed: session data missing.")
-                 return False
+                 return None # MODIFIED
             if not database_module.validate_captcha(self.captcha_input, session_captcha):
                 flash("Invalid captcha.", "error")
-                return False
+                return None # MODIFIED
 
-        # Process uploaded files
         processed_files = self.process_uploaded_files(POST_IMAGE_FOLDER_REL, is_thread=True)
-        # Returns list or None
 
-        if processed_files is None: # Critical error during file processing
-            return False
+        if processed_files is None: 
+            return None # MODIFIED
 
-        # New thread requires at least one *successfully processed* file
         if not processed_files:
             flash("You need to successfully upload at least one file to start a thread.", "error")
-            # This check is crucial after process_uploaded_files might have skipped invalid files
-            return False
-
-        # Check for comment (optional if file is present)
-        # This check is less critical now due to the file requirement above
+            return None # MODIFIED
+        
         if not self.comment and not processed_files:
-             # Should technically not be reachable if the above check is correct
              flash("You need to type something or upload a file.", "error")
-             return False
+             return None # MODIFIED
 
-        # --- Prepare data for DB ---
         original_filenames = [f['original'] for f in processed_files]
-        thumbnail_rel_paths = [f['thumbnail'] for f in processed_files] # Relative to static root
+        thumbnail_rel_paths = [f['thumbnail'] for f in processed_files]
 
-        # --- Add to Database ---
         new_post_id = database_module.add_new_post(
             self.user_ip,
             self.board_id,
-            self.post_name,         # Raw name (DB func applies tripcode)
-            self.original_content,  # Unformatted comment
-            self.comment,           # Formatted comment
+            self.post_name,        
+            self.original_content, 
+            self.comment,          
             self.embed,
             original_filenames,
-            thumbnail_rel_paths     # Relative thumb paths (e.g., 'post_images/thumbs/thumb_xyz.jpg')
+            thumbnail_rel_paths    
         )
 
         if new_post_id:
-            # --- Emit SocketIO Event ---
             try:
                 socket_files_data = []
                 for f_info in processed_files:
@@ -561,14 +532,13 @@ class PostHandler:
                 self.socketio.emit('nova_postagem', {
                     'type': 'New Thread',
                     'post': {
-                        'id': new_post_id, # ID of the new post (thread OP)
-                        'post_id': new_post_id, # Explicitly include post_id
-                        'name': display_name, # Name with tripcode applied
-                        'content': self.comment, # Formatted comment
-                        'files_data': socket_files_data, # URLs
+                        'id': new_post_id, 
+                        'post_id': new_post_id, 
+                        'name': display_name, 
+                        'content': self.comment, 
+                        'files_data': socket_files_data, 
                         'date': now_display,
                         'board': self.board_id,
-                        # 'role': 'user' # Could add user role if needed by frontend
                     }
                 })
                 logger.info(f"SocketIO 'nova_postagem' (New Thread) emitted for post {new_post_id}")
@@ -576,91 +546,67 @@ class PostHandler:
             except Exception as socket_err:
                  logger.error(f"Failed to emit SocketIO event for post {new_post_id}: {socket_err}", exc_info=True)
 
-            # Apply timeout
             self.timeout_manager.apply_timeout(self.user_ip, duration_seconds=35, reason="Automatic timeout after post.")
-            return True
+            return new_post_id # MODIFIED: Return the new post ID
         else:
-            # DB insert failed
             flash("Failed to save post to the database.", "error")
-            return False
+            return None # MODIFIED: Return None on DB failure
 
 # --- Main Route for Handling Posts and Replies ---
 @posts_bp.route('/new_post', methods=['POST'])
 def new_post():
-    # Get SocketIO instance from Flask app extensions
     socketio = current_app.extensions.get('socketio')
     if not socketio:
-        # This should not happen if SocketIO is initialized correctly
         logger.error("SocketIO instance not found in Flask app extensions!")
         flash("A server configuration error occurred (SocketIO).", "error")
-        return redirect(request.referrer or url_for('boards.main_page')) # Redirect back
+        return redirect(request.referrer or url_for('boards.main_page'))
     else:
         logger.info("--- SocketIO instance obtained successfully in /new_post ---")
 
-    # Get user IP (handle proxies)
     user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-    # Clean up potential multiple IPs in X-Forwarded-For
     if user_ip: user_ip = user_ip.split(',')[0].strip()
 
-    # Get form data
-    # Determine post mode: hidden input 'post_mode' or infer from comment
-    post_mode_form = request.form.get("post_mode", "post") # Default to creating a new post
-    comment_raw = request.form.get('text', '').strip() # Raw comment text
-    post_name_raw = request.form.get("name", "Anonymous").strip() # Raw name
-    board_id = request.form.get('board_id') # This is the board_uri
+    post_mode_form = request.form.get("post_mode", "post") 
+    comment_raw = request.form.get('text', '').strip() 
+    post_name_raw = request.form.get("name", "Anonymous").strip() 
+    board_id = request.form.get('board_id') 
     embed = request.form.get('embed', '').strip()
     captcha_input = request.form.get('captcha', '').strip()
-    thread_id_form = request.form.get('thread_id') # Explicit thread ID for replies
+    thread_id_form = request.form.get('thread_id') 
 
-    # --- Basic Input Validation ---
     if not board_id:
         flash('Board ID is missing.', 'error')
         logger.warning(f"Post attempt failed: Board ID missing. IP: {user_ip}")
         return redirect(request.referrer or url_for('boards.main_page'))
 
-    # Check if board exists (important!)
     if not database_module.get_board_info(board_id):
          flash(f"Board '/{board_id}/' does not exist.", 'error')
          logger.warning(f"Post attempt failed: Board '{board_id}' not found. IP: {user_ip}")
-         # Redirect to main page might be better than referrer if board is gone
          return redirect(url_for('boards.main_page'))
 
-    # Validate CAPTCHA here if required (Handler validates again, but good practice)
     captcha_required = database_module.verify_board_captcha(board_id)
     if captcha_required and not captcha_input:
         flash("Captcha is required for this board.", "error")
         return redirect(request.referrer or url_for('boards.board_page', board_uri=board_id))
-    # Actual validation against session happens in the handler
-
-    # --- Basic XSS/Input Filtering ---
-    # Filter comment and name BEFORE passing to Handler/formatting
+    
     if formatting.filter_xss(comment_raw) or formatting.filter_xss(post_name_raw):
         flash('HTML tags are not allowed in name or comment.', 'error')
         logger.warning(f"Post attempt blocked due to potential XSS. IP: {user_ip}, Board: {board_id}")
         return redirect(request.referrer or url_for('boards.board_page', board_uri=board_id))
-    # Embed URL validation could be added here if needed
 
-    # --- Initialize Handler ---
     handler = PostHandler(socketio, user_ip, post_mode_form, post_name_raw, board_id, comment_raw, embed, captcha_input)
 
-    # --- Moderation Checks ---
     if not handler.check_banned():
-        # Flash message set in check_banned
         return redirect(request.referrer or url_for('boards.board_page', board_uri=board_id))
     if not handler.check_timeout():
-        # Flash message set in check_timeout
         return redirect(request.referrer or url_for('boards.board_page', board_uri=board_id))
 
-    # --- Content Validation ---
     if not handler.validate_comment():
-         # Flash message set in validate_comment
          return redirect(request.referrer or url_for('boards.board_page', board_uri=board_id))
 
-    # --- Determine Actual Post Mode (Reply vs New Thread) ---
     is_reply_mode = False
     reply_to_thread_id = None
 
-    # Check for explicit reply mode via form input
     if post_mode_form == "reply" and thread_id_form:
         try:
             reply_to_thread_id = int(thread_id_form)
@@ -671,72 +617,75 @@ def new_post():
             logger.warning(f"Invalid thread_id '{thread_id_form}' in reply mode. IP: {user_ip}, Board: {board_id}")
             return redirect(request.referrer or url_for('boards.board_page', board_uri=board_id))
 
-    # Check for implicit reply mode via comment starting with #id or >>id
-    reply_match = re.match(r'^(?:#|>>)(\d+)', comment_raw) # Match #123 or >>123 at the start
+    reply_match = re.match(r'^(?:#|>>)(\d+)', comment_raw) 
     if not is_reply_mode and reply_match:
         potential_reply_target_id = int(reply_match.group(1))
-        # Determine the *thread* ID this potential target belongs to
         target_thread_id = database_module.get_thread_id_for_post(potential_reply_target_id)
 
         if target_thread_id:
             is_reply_mode = True
             reply_to_thread_id = target_thread_id
             logger.debug(f"Implicit reply mode detected via comment '{reply_match.group(0)}'. Replying to thread {reply_to_thread_id}")
-            # --- Important: Remove the #id or >>id part from the comment ---
-            # Re-initialize handler with the cleaned comment
             cleaned_comment = comment_raw[len(reply_match.group(0)):].lstrip()
             handler = PostHandler(socketio, user_ip, post_mode_form, post_name_raw, board_id, cleaned_comment, embed, captcha_input)
-            # Need to re-validate the cleaned comment's length if rules apply
             if not handler.validate_comment():
                  return redirect(request.referrer or url_for('boards.board_page', board_uri=board_id))
         else:
-             # Comment starts with #id or >>id, but target post doesn't exist
              flash(f"Cannot reply to post '{reply_match.group(0)}' as it doesn't exist.", "warning")
              logger.warning(f"Implicit reply failed: Target post '{reply_match.group(0)}' not found. IP: {user_ip}, Board: {board_id}")
-             # Treat as a normal post/reply without the reference? Or redirect?
-             # For now, let it proceed as a potential new thread if no explicit mode set.
-             pass # Or redirect: return redirect(request.referrer or url_for('boards.board_page', board_uri=board_id))
-
+             pass 
 
     # --- Execute Handler Logic ---
-    success = False
+    posted_id = None # MODIFIED: To store the ID of the created post/reply
+    
     if is_reply_mode:
-        if reply_to_thread_id: # Double check we have a valid thread ID
-            success = handler.handle_reply(reply_to_thread_id)
+        if reply_to_thread_id: 
+            posted_id = handler.handle_reply(reply_to_thread_id)
         else:
-             # Should not happen if logic above is correct, but handle defensively
              logger.error("Reply mode determined but reply_to_thread_id is missing.")
              flash("Internal error: Could not determine thread ID for reply.", "error")
-             success = False # Ensure redirection below
+             # posted_id remains None, will follow failure path
     else:
-        # Assume new thread creation mode
-        success = handler.handle_post()
+        posted_id = handler.handle_post()
 
     # --- Redirect based on success ---
-    if success:
-        flash("Post successful!", "success")
-        # Redirect to the board page after successful post/reply
-        # Using request.referrer can be problematic, prefer redirecting to board/thread
+    if posted_id: # MODIFIED: Check if an ID was returned (i.e., success)
+        flash(f"Post successful! ID: {posted_id}", "success") # MODIFIED: Include ID in flash message
+        
         if is_reply_mode and reply_to_thread_id:
-             # Redirect to the specific thread
-             return redirect(url_for('boards.replies', board_name=board_id, thread_id=reply_to_thread_id))
-        else:
-             # Redirect to the board's main page
-             return redirect(url_for('boards.board_page', board_uri=board_id))
+             referrer_url = request.referrer
+             if referrer_url:
+                 base_url = referrer_url.split('#')[0]
+                 # MODIFIED: Redirect to referrer (thread page) with an anchor to the new reply
+                 return redirect(f"{base_url}#p{posted_id}")
+             else:
+                 # Fallback if referrer is not available
+                 logger.warning("Referrer missing for reply redirect, falling back to board page.")
+                 return redirect(url_for('boards.board_page', board_uri=board_id))
+        else: # New thread
+             try:
+                # MODIFIED: Redirect to the new thread's page with an anchor.
+                # Assumes a route named 'boards.thread_page' exists for viewing threads.
+                # The new thread's ID (posted_id) is used as thread_id for the route.
+                # The anchor #p<ID> points to the OP of the new thread.
+                thread_redirect_url = url_for('boards.thread_page', board_uri=board_id, thread_id=posted_id, _anchor=f'p{posted_id}')
+                return redirect(thread_redirect_url)
+             except Exception as e: 
+                logger.warning(
+                    f"Could not build URL for thread view (board: {board_id}, thread: {posted_id}): {e}. "
+                    "Falling back to board page redirect."
+                )
+                # Fallback to the board page if the specific thread URL cannot be constructed
+                return redirect(url_for('boards.board_page', board_uri=board_id))
     else:
         # Handler failed, flash message should already be set by the handler
-        # Redirect back to the previous page (referrer or board page)
         return redirect(request.referrer or url_for('boards.board_page', board_uri=board_id))
 
-
 # --- SocketIO Endpoint (Placeholder/Example) ---
-# This route is usually handled by the SocketIO library itself
-# and doesn't need explicit definition unless you have specific needs.
+# ... (rest of the file is unchanged)
 # @posts_bp.route('/socket.io/')
 # def socket_io_endpoint():
-#     # Logic here is typically managed by Flask-SocketIO extension based on events
 #     logger.debug("Received request to /socket.io/ endpoint (usually handled by library)")
-#     # Return an appropriate response or let the library handle it
-#     return "Socket.IO Endpoint", 200 # Or maybe 404 if direct access is not intended
+#     return "Socket.IO Endpoint", 200
 
 # --- END OF FILE posts_bp.py ---
