@@ -6,7 +6,7 @@
     <div class="divisoria"></div>
     <div class="post" post-role="operator" id="{{ post.post_id }}"> {# Используем post.post_id #}
         <div class="postInfo">
-            <input id="togglemodoptions_post_{{ post.post_id }}" type="checkbox" class="deletionCheckBox" value="{{ post.post_id }}" form="banDeleteForm">
+            <input id="togglemodoptions_post_{{ post.post_id }}" type="checkbox" class="deletionCheckBox" value="{{ post.post_id }}" form="banDeleteForm">&nbsp;
             <span class="nameBlock"><span class="name">{% if not post.post_user or post.post_user == 'Anonymous' %}Anon{% else %}{{ post.post_user | safe }}{% endif %}</span> </span> 
             <span class="postDate" data-iso-date="{{ post.post_date }}">{{ post.date_display }}</span>&nbsp; 
 			<a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No.</a> <a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ post.post_id }}">{{ post.post_id }}</a>{% include 'utils/thread-moderation-options.html' %}
@@ -36,7 +36,7 @@
                             
                                 <img draggable="false" class="post_img"
                                      src="{{ url_for('static', filename=thumb_path) }}" {# Используем путь к миниатюре #}
-                                     <a href="{{ image_url }}"> {# Делаем миниатюру ссылкой на оригинал #}>
+                                     <a href="{{ image_url }}"> {# Делаем миниатюру ссылкой на оригинал #}
                             </a>
                         {% else %}
                              {# Можно показать плейсхолдер, если миниатюры нет #}
