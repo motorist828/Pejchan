@@ -1,11 +1,13 @@
 # Pejchan
 
 This imageboad is an improvement of [rchan](https://github.com/lainsec/rchan)
-Added thumbnails, support for mp3 files, improved form for sending posts, design changes
-Сonvenient viewing of media files, improved statistics, bug fixes, many other minor improvements
+Database changed to SQLite, thumbnails added, mp3 support, improved message form, design changes, redesigned admin panel
+Convenient viewing of media files, improved statistics, bug fixes, many other small improvements
 
 ![pic0](./img/1.png)
 ![pic0](./img/2.png)
+
+The rest of the screenshots are in the img folder
 
 ## How to install
 
@@ -29,11 +31,13 @@ pip install -r requirements.txt
 
 ## How to use
 ```bash
- python3 app.py or python app.py depending on your OS
-`The first account will automatically get OWNER permissions. 
- Use a long enough password when registering.
- You can change the name in the templates\index.html file. Line #21
- About - /templates/utils/index-about-container.html`
+ run database_setup.py once
+ run app.py 
+ The password and administrator name are set in the database_setup.py file.. 
+ Also change the passcode in the posts_bp.py file line 465
+ enter passcode in embed to disable timeout between messages
+ About - /templates/utils/index-about-container.html
+
 ```
 # Features
 - [x] Free creation of boards for all users.

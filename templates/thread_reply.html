@@ -21,10 +21,12 @@
 	    {% include 'utils/thread-options-container.html' %}
         {% include 'utils/threadform.html' %}   
         {% include 'utils/replies.html' %}
+        {% include 'utils/popup-ban.html' %}
         {% include 'utils/waring-container.html' %}
-		{% include 'utils/threadform.html' %}
+	{% include 'utils/threadform.html' %}
 		<br><br>
     </div>
+
     <div id="reinrun"></div>
     {% include 'utils/footer.html' %}
     <script src="/static/js/postform.js"></script>
@@ -32,9 +34,10 @@
     <script src="/static/js/boardstyle.js"></script>
     <script src="/static/js/flash.js"></script>
     <script src="/static/js/mediascript.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script src="/static/js/thread.js"></script>
     <script src="/static/js/socket.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    
 	
 	    <!-- Кнопки прокрутки -->
     <button class="scroll-btn" id="scroll-up" title="Вверх">↑</button>

@@ -171,6 +171,16 @@ body {
     text-decoration: none;
 }
 
+.board-options ul li a {
+  background: rgba(173, 87, 19, .5);
+}
+
+
+.catalog-container .catalog-post{
+  background-color: #cfc99d;
+
+}
+
 #togglePostFormLink {
     border: 1px solid rgba(173, 87, 19, .8);
     background: rgba(173, 87, 19, .5);
@@ -227,6 +237,11 @@ input, select, textarea {
     color: #af0a0f;
 }
 
+.post_content {
+  color: var(--cor-secundaria);
+}
+
+
 .posts {
     display: flex;
     align-items: flex-start;
@@ -282,6 +297,12 @@ input, select, textarea {
     transition: filter 0.3s ease;
     box-sizing: border-box;
     box-shadow: inset 0 1px #D2D8BB, 0 0 5px rgba(0, 0, 0, 0.125);
+}
+
+.reply:hover {
+    border-color: var(--cor-secundaria);
+    background-color: rgba(var(--cor-fundo-claro-rgb, 39, 39, 42), 0.1);
+    box-shadow: 0 0 8px rgba(var(--cor-secundaria-rgb), 0.25);
 }
 
 @media (max-width: 600px) {

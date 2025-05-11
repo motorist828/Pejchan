@@ -1,0 +1,50 @@
+<div class="catalog-post">
+    <div class="catalog-post-info">
+        {# Чекбокс для модерации? #}
+        
+        
+        <span class="postDate" data-iso-date="{{ post.post_date }}">{{ post.date_display }}</span>&nbsp;
+        <a href="{{ url_for('boards.replies', board_name=board_id, thread_id=post.post_id) }}" class="postLink">No. </a>
+        <a class="postLink" href="#{{ post.post_id }}" data-post-id="{{ post.post_id }}">{{ post.post_id }}</a> {# Ссылка на якорь или JS #}
+        
+
+        {# --- Подсчет ответов и файлов --- #}
+        <div class="catalog-post-counter">
+            {% set reply_count = 0 %}
+            {# Проверяем, как передаются ответы: как словарь превью или как полный список #}
+            {% if replies is mapping %} {# Если replies - это словарь {post_id: [ответы]} #}
+                {% set post_replies_list = replies.get(post.post_id, []) %}
+                {% set reply_count = post_replies_list | length %}
+            {% elif replies is iterable and not replies is string %} {# Если replies - это полный список всех ответов #}
+                 {% set reply_count = replies | selectattr('post_id', 'equalto', post.post_id) | list | length %}
+            {% endif %}
+            {# Подсчет файлов из списка #}
+            {% set file_count = post.post_images_list | length if post.post_images_list else 0 %}
+            R: {{ reply_count }} / F: {{ file_count }}
+            {# / P: 1 ? Что значит P? Если количество страниц, то не здесь #}
+        </div>
+        {# --- Конец подсчета --- #}
+
+    </div>
+    <div class="catalog-post-file">
+        {# Ссылка на тред #}
+        <a href="{{ url_for('boards.replies', board_name=board_id, thread_id=post.post_id) }}">
+            {# Проверяем наличие миниатюр #}
+            {% if post.imagesthb_list and post.imagesthb_list[0] %}
+                {# Отображаем первую миниатюру #}
+                <img draggable="false" class="catalog_thumb" {# Используем специфичный класс? #}
+                     src="{{ url_for('static', filename=post.imagesthb_list[0]) }}"
+                     alt="{{ lang['catalog-image-alt'] | default('Thread image') }} {{ post.post_id }}">
+            {% else %}
+                 {# Плейсхолдер, если нет миниатюры #}
+                 <img draggable="false" class="catalog_thumb placeholder_thumb"
+                      src="{{ url_for('static', filename='placeholder-catalog.png') }}" {# Пример имени файла #}
+                      alt="{{ lang['catalog-no-image-alt'] | default('No image') }}">
+            {% endif %}
+        </a>
+    </div>
+    <div class="catalog-post-content">
+        {# Отображаем ОРИГИНАЛЬНЫЙ контент без HTML-тегов #}
+        <pre>{{ post.get('original_content', '')[:250] | striptags }}</pre> {# Уменьшил длину для каталога #}
+    </div>
+</div>

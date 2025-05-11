@@ -22,9 +22,10 @@
         <h1 class="board-title">/{{ board_info.board_uri }}/ - {{ board_info.board_name }}</h1>
         
         {% include 'utils/board-options-container.html' %}
-		{% include 'utils/threadform.html' %}
+	{% include 'utils/threadform.html' %}
         {% include 'utils/pinned_posts.html' %}
         {% include 'utils/board_posts.html' %}
+        {% include 'utils/popup-ban.html' %}
         {% include 'utils/board_pagination.html' %}
         {% include 'utils/waring-container.html' %}
 		
@@ -38,9 +39,10 @@
     <script src="/static/js/boardstyle.js"></script>
     <script src="/static/js/flash.js"></script>
     <script src="/static/js/mediascript.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script src="/static/js/thread.js"></script>
     <script src="/static/js/socket.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
 	    <!-- Кнопки прокрутки -->
     <button class="scroll-btn" id="scroll-up" title="Вверх">↑</button>
     <button class="scroll-btn" id="scroll-down" title="Вниз">↓</button>

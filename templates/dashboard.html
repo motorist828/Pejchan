@@ -1,158 +1,289 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="{{ lang.current_lang_code | default('en') }}"> {# Используем язык из сессии или 'en' по умолчанию #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - {{ username }}</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <title>{{ lang.dashboard_title | default("Dashboard") }} - {{ username }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> {# Для иконок, если нужны #}
     <style>
         .dashboard-container {
             display: grid;
-            grid-template-columns: 250px 1fr;
+            grid-template-columns: 250px 1fr; /* Sidebar and main content */
             gap: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
+            max-width: 1300px; /* Немного шире для таблицы банов */
+            margin: 20px auto; /* Отступы сверху/снизу и авто по бокам */
             padding: 20px;
-            color: #fff;
+            color: var(--cor-texto);
         }
 
         .sidebar {
             background-color: var(--cor-fundo-claro);
             border: 1px solid var(--cor-borda);
-            border-radius: 8px;
+            border-radius: var(--border-radius-md);
             padding: 20px;
+            box-shadow: var(--shadow-dark-sm);
+            align-self: start; /* Сайдбар не растягивается по высоте контента */
         }
-
-        .sidebar a {
+        .sidebar nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar nav li {
+            margin-bottom: 10px;
+        }
+        .sidebar nav a {
             text-decoration: none;
             color: var(--cor-secundaria);
+            padding: 8px 12px;
+            display: block;
+            border-radius: var(--border-radius-sm);
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+        .sidebar nav a:hover, .sidebar nav a.active { /* Стиль для активной ссылки */
+            background-color: var(--cor-primaria);
+            color: white;
         }
 
         .main-content {
-            background-color: var(--cor-fundo-claro);
-            border: 1px solid var(--cor-borda);
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            /* Стили для основного контента, если нужны общие */
         }
 
         .mod-section {
+            background-color: var(--cor-fundo-claro);
+            border: 1px solid var(--cor-borda);
+            border-radius: var(--border-radius-md);
+            padding: 20px;
             margin-bottom: 30px;
-            border-bottom: 1px solid var(--cor-borda);
-            padding-bottom: 20px;
+            box-shadow: var(--shadow-dark-sm);
+        }
+        .mod-section h2 {
+            margin-top: 0;
+            padding-bottom: 0.5em;
+            border-bottom: 1px solid var(--cor-borda-claro);
+            margin-bottom: 1em;
+            color: var(--cor-texto-claro);
         }
 
-        .mod-section:last-child {
-            border-bottom: none;
-        }
 
         .board-list {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 15px;
         }
 
         .board-card {
-            border-radius: 5px;
+            border-radius: var(--border-radius-sm);
             padding: 15px;
-            background-color: var(--cor-fundo-claro);
-            border: 1px solid var(--cor-borda);
-            box-shadow: 4px 4px 0px #d2738a2e;
+            background-color: var(--cor-fundo);
+            border: 1px solid var(--cor-borda-claro);
+            box-shadow: var(--shadow-dark-sm);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
-
+        .board-card h3 { margin-top: 0; }
         .board-card h3 a {
             text-decoration: none;
             color: var(--cor-secundaria);
+            transition: color 0.2s ease;
         }
+        .board-card h3 a:hover { color: var(--cor-primaria); }
+        .board-card p {
+            margin-bottom: 0.5em;
+            font-size: 0.9em;
+            color: var(--cor-terciaria);
+            flex-grow: 1; /* Позволяет описанию занимать доступное место */
+        }
+        .board-card p small { font-style: italic; }
+
 
         .stat-card {
-            background-color: var(--cor-fundo-claro);
-            border: 1px solid var(--cor-borda);
-            box-shadow: 4px 4px 0px #d2738a2e;
+            background-color: var(--cor-fundo);
+            border: 1px solid var(--cor-borda-claro);
+            box-shadow: var(--shadow-dark-sm);
             padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 15px;
+            border-radius: var(--border-radius-sm);
+            margin-bottom: 20px;
         }
+        .stat-card h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: var(--cor-texto); /* Менее акцентный для подзаголовков карточек */
+            font-size: 1.1em;
+        }
+        .stat-card p { margin-bottom: 0.5em; }
+
 
         .action-buttons {
             display: flex;
             gap: 10px;
-            margin-top: 10px;
+            margin-top: 15px;
             flex-wrap: wrap;
         }
 
-        .btn {
-            padding: 8px 12px;
+        .btn { /* Общий стиль кнопок */
+            padding: 8px 15px;
+            font-size: 0.9em;
             border: none;
-            border-radius: 4px;
+            border-radius: var(--border-radius-sm);
             cursor: pointer;
-            font-size: 14px;
-            white-space: nowrap;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+            font-weight: 600;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Легкая тень при ховере */
         }
 
-        .btn-danger {
-            background-color: #ff4444;
-            color: white;
+        .btn-danger { background-color: var(--cor-erro); color: white; }
+        .btn-danger:hover { background-color: #dc2626; }
+
+        .btn-warning { background-color: #f59e0b; color: var(--cor-fundo); }
+        .btn-warning:hover { background-color: #d97706; }
+
+        .btn-success { background-color: #10b981; color: white; }
+        .btn-success:hover { background-color: #059669; }
+
+        .btn-primary { background-color: var(--cor-primaria); color: white; }
+        .btn-primary:hover { background-color: #3b4558; }
+
+        .btn-info { background-color: var(--cor-secundaria); color: white; }
+        .btn-info:hover { background-color: #5a809d; }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8em;
         }
 
-        .btn-warning {
-            background-color: #ffbb33;
-            color: black;
-        }
-
-        .btn-success {
-            background-color: #00C851;
-            color: white;
-        }
-
-        .btn-primary {
-            background-color: #4285F4;
-            color: white;
-        }
 
         .user-info {
             margin-bottom: 20px;
             padding-bottom: 20px;
             border-bottom: 1px solid var(--cor-borda);
+            text-align: center;
         }
-
+        .user-info h2 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            color: var(--cor-texto-claro);
+        }
         .role-badge {
             display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
             font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .role-badge.owner { background-color: #ef4444; color: white; }
+        .role-badge.mod { background-color: #3b82f6; color: white; }
+        .role-badge.user { background-color: #22c55e; color: white; }
+        .role-badge.anon { background-color: var(--cor-terciaria); color: var(--cor-fundo); }
+
+
+        /* Стили для списка недавних постов */
+        .recent-posts-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .recent-posts-list li {
+            background-color: var(--cor-fundo);
+            padding: 12px 15px; /* Увеличил паддинг */
+            margin-bottom: 10px;
+            border-radius: var(--border-radius-sm);
+            border: 1px solid var(--cor-borda-claro);
+        }
+        .recent-posts-list li .post-meta strong { color: var(--cor-texto-claro); }
+        .recent-posts-list li .post-meta a { color: var(--cor-secundaria); text-decoration: none;}
+        .recent-posts-list li .post-meta a:hover { text-decoration: underline; color: var(--cor-primaria);}
+        .recent-posts-list li .post-meta small {
+            display: block;
+            font-size: 0.8em;
+            color: var(--cor-terciaria);
+            margin-top: 3px;
+            margin-bottom: 8px;
+        }
+        .recent-posts-list li .post-preview-content {
+             overflow-wrap: break-word;
+             font-size: 0.9em;
+             color: var(--cor-texto);
+             margin-bottom: 10px;
         }
 
-        .owner {
-            background-color: #ff4444;
-            color: white;
+
+        /* Стили для таблицы (баны, управление пользователями) */
+        .dashboard-table-wrapper { /* Обертка для скролла */
+            overflow-x: auto;
+        }
+        .dashboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.9em;
+            border: 1px solid var(--cor-borda);
+        }
+        .dashboard-table th, .dashboard-table td {
+            border: 1px solid var(--cor-borda-claro);
+            padding: 10px;
+            text-align: left;
+            vertical-align: middle; /* Вертикальное выравнивание по центру */
+        }
+        .dashboard-table th {
+            background-color: var(--cor-fundo);
+            color: var(--cor-texto-claro);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .dashboard-table tbody tr:nth-child(even) {
+            background-color: rgba(var(--cor-fundo-rgb, 24, 24, 27), 0.3);
+        }
+        .dashboard-table tbody tr:hover {
+            background-color: rgba(var(--cor-borda-claro-rgb, 82, 82, 91), 0.2);
+        }
+        .dashboard-table td form { margin: 0; display: inline-block; }
+        .dashboard-table td .btn { margin-right: 5px; }
+        .dashboard-table td .btn:last-child { margin-right: 0; }
+
+
+        /* Формы в Global Settings */
+        .global-settings-form {
+            margin-top: 10px;
+            display: flex; /* Для расположения селекта и кнопки в ряд */
+            flex-wrap: wrap; /* Перенос на моб. */
+            align-items: center;
+        }
+        .global-settings-form select, .global-settings-form .btn {
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .global-settings-form select {
+            padding: 8px;
+            max-width: 250px;
+            background-color: var(--cor-fundo);
+            border-color: var(--cor-borda-claro);
+            color: var(--cor-texto);
         }
 
-        .mod {
-            background-color: #4285F4;
-            color: white;
-        }
 
-        .user {
-            background-color: #00C851;
-            color: white;
-        }
-
-        /* Responsividade */
+        /* Адаптивность */
         @media (max-width: 992px) {
             .dashboard-container {
                 grid-template-columns: 1fr;
             }
-            
             .sidebar {
-                order: 2;
+                
+                margin-top: 20px;
             }
-            
             .main-content {
                 order: 1;
             }
-            
             .board-list {
                 grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             }
@@ -162,15 +293,30 @@
             .dashboard-container {
                 padding: 10px;
                 gap: 15px;
+                margin-top: 60px;
             }
-            
-            .sidebar, .main-content {
+            .sidebar, .mod-section {
                 padding: 15px;
             }
-            
             .action-buttons {
                 flex-direction: column;
-                gap: 8px;
+                align-items: stretch; /* Кнопки на всю ширину */
+            }
+            .action-buttons .btn, .action-buttons form .btn { /* Уточнил селектор */
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .dashboard-table th, .dashboard-table td {
+                padding: 8px; /* Уменьшил паддинг */
+                font-size: 0.85em;
+            }
+            .global-settings-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .global-settings-form select, .global-settings-form .btn {
+                width: 100%;
+                margin-right: 0;
             }
         }
 
@@ -178,168 +324,375 @@
             .board-list {
                 grid-template-columns: 1fr;
             }
-            
-            .board-card {
-                padding: 12px;
-            }
-            
-            .user-info h2 {
-                font-size: 1.5rem;
-            }
-            
-            .sidebar nav ul {
-                padding-left: 15px;
-            }
-            
-            .sidebar nav li {
-                margin-bottom: 10px;
-            }
+            .user-info h2 { font-size: 1.3em; }
+            .sidebar nav ul { padding-left: 0; }
+            .sidebar nav li a { padding: 8px; }
+            .mod-section { padding: 10px; }
         }
 
-        /* Melhorias para mobile */
         @media (hover: none) {
             .btn {
-                padding: 10px 12px; /* Maior área de toque */
+                padding: 10px 15px;
             }
         }
     </style>
 </head>
 <body>
     {% include 'utils/navbar.html' %}
+
     <div class="dashboard-container">
         <!-- Sidebar -->
-        <div class="sidebar">
+        <aside class="sidebar">
             <div class="user-info">
                 <h2>{{ username }}</h2>
                 <span class="role-badge
-                    {% if 'owner' in roles.lower() %}owner
-                    {% elif 'mod' in roles.lower() %}mod
-                    {% else %}user{% endif %}">
-                    {% if roles == '' %}
-                    Anon
-                    {% else %}
-                    {{ roles }}
-                    {% endif %}
+                    {% if 'owner' in roles|lower %}owner
+                    {% elif 'mod' in roles|lower %}mod
+                    {% elif roles and roles|trim != '' %}user {# Проверяем, что roles не пустая строка после trim #}
+                    {% else %}anon{% endif %}"> {# Если roles пустая или None -> anon #}
+                    {{ roles | capitalize if (roles and roles|trim != '') else 'User' }}
                 </span>
             </div>
 
             <nav>
                 <ul>
-                    <li><a href="#overview">{{ lang["dashboard-general-view"] }}</a></li>
-                    <li><a href="#boards">{{ lang["dashboard-my-boards"] }}</a></li>
-                    {% if 'owner' in roles.lower() or 'mod' in roles.lower() %}
-                        <li><a href="#mod-tools">{{ lang["dashboard-moderation-tools"] }}</a></li>
-                        <li><a href="#global-settings">{{ lang["dashboard-global-configurations"] }}</a></li>
+                    <li><a href="#overview" class="active">{{ lang.dashboard_general_view | default("Overview") }}</a></li>
+                    <li><a href="#boards">{{ lang.dashboard_my_boards | default("My Boards") }}</a></li>
+                    {% if roles and ('owner' in roles|lower or 'mod' in roles|lower) %}
+                        <li><a href="#mod-tools">{{ lang.dashboard_moderation_tools | default("Moderation Tools") }}</a></li>
                     {% endif %}
-                    <li><a href="/logout">Logout</a></li>
+                    {% if roles and 'owner' in roles|lower %} {# Только для владельца #}
+                        <li><a href="#user-management">{{ lang.dashboard_user_management | default("User Management") }}</a></li>
+                        <li><a href="#global-settings">{{ lang.dashboard_global_configurations | default("Global Settings") }}</a></li>
+                    {% endif %}
+                    <li><a href="{{ url_for('auth.logout') }}">{{ lang.dashboard_logout | default("Logout") }}</a></li>
                 </ul>
             </nav>
-        </div>
+        </aside>
 
         <!-- Main Content -->
-        <div class="main-content">
+        <main class="main-content">
             <section id="overview" class="mod-section">
-                <h2>{{ lang["dashboard-general-view"] }}</h2>
+                <h2>{{ lang.dashboard_general_view | default("Overview") }}</h2>
                 <div class="stat-card">
-                    <h3>{{ lang["dashboard-ib-statistics"] }}</h3>
-                    <p><strong>{{ lang["dashboard-total-boards"] }}:</strong> {{ all_boards|length }}</p>
-                    <p><strong>{{ lang["dashboard-total-posts"] }}:</strong> {{ total_posts_count }}</p>
+                    <h3>{{ lang.dashboard_ib_statistics | default("Imageboard Statistics") }}</h3>
+                    <p><strong>{{ lang.dashboard_total_boards | default("Total Boards") }}:</strong> {{ boards|length if boards else 0 }}</p>
+                    <p><strong>{{ lang.dashboard_total_posts | default("Total Posts (Threads)") }}:</strong> {{ total_posts_count | default(0) }}</p>
                 </div>
             </section>
 
             <section id="boards" class="mod-section">
-                <h2>{{ lang["dashboard-my-boards"] }}</h2>
-                <div class="board-list">
-                    {% for board in user_boards %}
-                        <div class="board-card">
-                            <h3><a href="/{{ board.board_uri }}">{{ board.board_name }}</a></h3>
-                            <p>{{ board.board_desc }}</p>
-                            <p><small>/{{ board.board_uri }}/</small></p>
-
-                            <div class="action-buttons">
-                                <a href="/{{ board.board_uri }}/banners" class="btn btn-primary">{{ lang["dashboard-my-boards-manage"] }}</a>
-                                <form action="/remove_board/{{ board.board_uri }}" method="POST">
-                                    <button type="submit" class="btn btn-danger">{{ lang["dashboard-my-boards-remove"] }}</button>
-                                </form>
+                <h2>{{ lang.dashboard_my_boards | default("My Boards") }}</h2>
+                {% if user_boards %} {# Проверяем, есть ли у пользователя доски #}
+                    <div class="board-list">
+                        {% for board in user_boards %}
+                            <div class="board-card">
+                                <div> {# Дополнительная обертка для контента карточки, чтобы кнопка была внизу #}
+                                    <h3><a href="{{ url_for('boards.board_page', board_uri=board.board_uri) }}">{{ board.board_name }}</a></h3>
+                                    <p>{{ board.board_desc | truncate(100, True) if board.board_desc else (lang.no_description | default('No description.')) }}</p>
+                                    <p><small>/{{ board.board_uri }}/</small></p>
+                                </div>
+                                <div class="action-buttons">
+                                    <a href="{{ url_for('boards.board_banners', board_uri=board.board_uri) }}" class="btn btn-info btn-sm">{{ lang.dashboard_my_boards_manage_banners | default("Banners") }}</a>
+                                    <form action="{{ url_for('auth.remove_board', board_uri=board.board_uri) }}" method="POST" onsubmit="return confirm('{{ lang.confirm_delete_board | default('Are you sure you want to delete board /') }}{{ board.board_uri }}/ {{ lang.confirm_and_all_content | default('and all its content? This action cannot be undone.') }}');">
+                                        <button type="submit" class="btn btn-danger btn-sm">{{ lang.dashboard_my_boards_remove | default("Delete") }}</button>
+                                    </form>
+                                </div>
                             </div>
-                        </div>
-                    {% endfor %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p>
+                        {{ lang.dashboard_no_boards_yet | default("You don't have any boards yet.") }}
+                        {% if roles and 'owner' in roles|lower %}
+                            <a href="{{ url_for('boards.create') }}">{{ lang.dashboard_create_board | default("Create one now!") }}</a>
+                        {% endif %}
+                    </p>
+                {% endif %}
 
-                    {% if not user_boards %}
-                        <p>You still don't have any board. <a href="/create">Create Board</a></p>
-                    {% endif %}
+                {# Кнопка "Создать новую доску" В КОНЦЕ секции, доступна только владельцу сайта #}
+                {# --- УСЛОВИЕ ДЛЯ ВЛАДЕЛЬЦА САЙТА (SITE OWNER) --- #}
+                {% if roles and 'owner' in roles|lower %}
+                <div class="action-buttons" style="margin-top: 20px; justify-content: flex-start;"> {# Выравнивание по левому краю #}
+                     <a href="{{ url_for('boards.create') }}" class="btn btn-success"><i class="fas fa-plus"></i> {{ lang.dashboard_create_new_board | default("Create New Board") }}</a>
                 </div>
+                {% endif %}
+                {# --- КОНЕЦ УСЛОВИЯ --- #}
             </section>
 
-            {% if 'owner' in roles.lower() or 'mod' in roles.lower() %}
+            {% if roles and ('owner' in roles|lower or 'mod' in roles|lower) %}
                 <section id="mod-tools" class="mod-section">
-                    <h2>{{ lang["dashboard-moderation-tools"] }}</h2>
-
-                    <div class="stat-card">
-                        <h3>{{ lang["dashboard-content-moderation"] }}</h3>
-                        <p>Use this tools to moderate the anexed content of the imageboard.</p>
-
-                        <div class="action-buttons">
-                            <a href="#recent-posts" class="btn btn-primary">{{ lang["dashboard-recent-posts"] }}</a>
-                            <a href="#reported-content" class="btn btn-warning">{{ lang["dashboard-content-moderation-reported"] }}</a>
-                        </div>
-                    </div>
+                    <h2>{{ lang.dashboard_moderation_tools | default("Moderation Tools") }}</h2>
 
                     <div id="recent-posts" class="stat-card">
-                        <h3>{{ lang["dashboard-recent-posts"] }} (10)</h3>
-                        <ul>
-                            {% for post in recent_dashboard_posts %}
-                                <li>
-                                    <strong>{{ post.post_user }}</strong> em /{{ post.board }}/
-                                    <small>{{ post.post_date }}</small>
-                                    <div class="action-buttons">
-                                        <form action="/delete_post/{{ post.post_id }}" method="POST">
-                                            <input type="hidden" name="board_owner" value="{{ post.board_owner_info or '' }}">
-                                            <button type="submit" class="btn btn-danger">{{ lang["dashboard-recent-posts-remove"] }}</button>
-                                        </form>
-                                        <form action="/ban_user/{{ post.post_id }}" method="POST">
-                                            <input type="hidden" name="board_owner" value="{{ post.board_owner_info or '' }}">
-                                            <button type="submit" class="btn btn-warning">{{ lang["dashboard-recent-posts-ban"] }}</button>
-                                        </form>
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        </ul>
+                        <h3>{{ lang.dashboard_recent_posts | default("Recent Posts") }} ({{ recent_dashboard_posts|length }})</h3>
+                        {% if recent_dashboard_posts %}
+                            <ul class="recent-posts-list">
+                                {% for post in recent_dashboard_posts %}
+                                    <li>
+                                        <div class="post-meta">
+                                            <strong>{{ post.post_user | safe }}</strong>
+                                            {{ lang.in_board | default("in") }} <a href="{{ url_for('boards.board_page', board_uri=post.board_uri) }}">/{{ post.board_uri }}/</a>
+                                            (#<a href="{{ url_for('boards.replies', board_name=post.board_uri, thread_id=post.post_id) }}">{{ post.post_id }}</a>)
+                                            <small>{{ post.date_display }}</small>
+                                        </div>
+                                        <p class="post-preview-content">{{ post.original_content | striptags | truncate(150, True) if post.original_content else (lang.no_content | default("No content")) }}</p>
+                                        <div class="action-buttons">
+                                            <button type="button" class="btn btn-warning btn-sm" onclick="openBanDialog('{{ post.post_id }}', '{{ post.board_uri }}')">{{ lang.dashboard_ban_user | default("Ban User") }}</button>
+                                            <form action="{{ url_for('auth.delete_post', post_id=post.post_id) }}" method="POST" onsubmit="return confirm('{{ lang.confirm_delete_post | default('Are you sure you want to delete this post?') }}');">
+                                                <input type="hidden" name="board_owner" value="{{ post.board_owner_info or '' }}">
+                                                <button type="submit" class="btn btn-danger btn-sm">{{ lang.dashboard_delete_post | default("Delete Post") }}</button>
+                                            </form>
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>{{ lang.dashboard_no_recent_posts | default("No recent posts to display.") }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div id="banned-users" class="stat-card">
+                        <h3>{{ lang.dashboard_banned_users | default("Banned Users") }} ({{ active_bans|length }})</h3>
+                        {% if active_bans %}
+                            <div class="dashboard-table-wrapper">
+                                <table class="dashboard-table">
+                                    <thead>
+                                        <tr>
+                                            <th>IP Address</th>
+                                            <th>{{ lang.table_reason | default("Reason") }}</th>
+                                            <th>{{ lang.table_banned_by | default("Banned By") }}</th>
+                                            <th>{{ lang.table_banned_at | default("Banned At") }}</th>
+                                            <th>{{ lang.table_banned_until | default("Banned Until") }}</th>
+                                            <th>{{ lang.table_actions | default("Actions") }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for ban in active_bans %}
+                                        <tr>
+                                            <td>{{ ban.user_ip }}</td>
+                                            <td>{{ ban.reason | default('N/A') }}</td>
+                                            <td>{{ ban.moderator | default('System') }}</td>
+                                            <td>{{ ban.applied_at_display }}</td>
+                                            <td>{{ ban.end_time_display }}</td>
+                                            <td>
+                                                <form action="{{ url_for('auth.unban_user_ip') }}" method="POST" onsubmit="return confirm('{{ lang.confirm_unban_ip | default('Are you sure you want to unban this IP: ') }}{{ ban.user_ip }}?');">
+                                                    <input type="hidden" name="user_ip" value="{{ ban.user_ip }}">
+                                                    <button type="submit" class="btn btn-success btn-sm">
+                                                        {{ lang.dashboard_unban_user | default("Unban") }}
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p>{{ lang.dashboard_no_banned_users | default("No users are currently banned.") }}</p>
+                        {% endif %}
+                    </div>
+                </section>
+            {% endif %} {# Конец Mod Tools #}
+
+            {% if roles and 'owner' in roles|lower %} {# Только для владельца #}
+                <section id="user-management" class="mod-section">
+                    <h2>{{ lang.dashboard_user_management | default("User Role Management") }}</h2>
+                    <div class="stat-card">
+                        <h3>{{ lang.dashboard_manage_moderators | default("Manage Moderators") }}</h3>
+                        <p>{{ lang.dashboard_manage_moderators_desc | default("Assign or remove moderator privileges from users. Owners cannot be demoted here.") }}</p>
+
+                        {% if manageable_users %}
+                            <div class="dashboard-table-wrapper">
+                                <table class="dashboard-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Username</th>
+                                            <th>{{ lang.table_current_role | default("Current Role") }}</th>
+                                            <th>{{ lang.table_actions | default("Actions") }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for user_item in manageable_users %}
+                                        <tr>
+                                            <td>{{ user_item.username }}</td>
+                                            <td>
+                                                <span class="role-badge
+                                                    {% if 'owner' in user_item.role|lower %}owner
+                                                    {% elif 'mod' in user_item.role|lower %}mod
+                                                    {% else %}user{% endif %}">
+                                                    {{ user_item.role | default('user') | capitalize }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if 'owner' not in user_item.role|lower %}
+                                                    {% if 'mod' in user_item.role|lower %}
+                                                        <form action="{{ url_for('auth.set_user_mod_role') }}" method="POST">
+                                                            <input type="hidden" name="target_username" value="{{ user_item.username }}">
+                                                            <input type="hidden" name="action" value="remove_mod">
+                                                            <button type="submit" class="btn btn-warning btn-sm"
+                                                                    onclick="return confirm('{{ lang.confirm_remove_mod | default('Are you sure you want to remove moderator role from ') }}{{ user_item.username }}?');">
+                                                                {{ lang.dashboard_remove_mod | default("Remove Mod") }}
+                                                            </button>
+                                                        </form>
+                                                    {% else %}
+                                                        <form action="{{ url_for('auth.set_user_mod_role') }}" method="POST">
+                                                            <input type="hidden" name="target_username" value="{{ user_item.username }}">
+                                                            <input type="hidden" name="action" value="set_mod">
+                                                            <button type="submit" class="btn btn-success btn-sm"
+                                                                    onclick="return confirm('{{ lang.confirm_set_mod | default('Are you sure you want to assign moderator role to ') }}{{ user_item.username }}?');">
+                                                                {{ lang.dashboard_set_mod | default("Set as Mod") }}
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span style="font-style: italic; color: var(--cor-terciaria);">{{ lang.dashboard_owner_role_fixed | default("Owner (Fixed)") }}</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p>{{ lang.dashboard_no_other_users | default("No other users to manage.") }}</p>
+                        {% endif %}
                     </div>
                 </section>
 
                 <section id="global-settings" class="mod-section">
-                    <h2>{{ lang["dashboard-global-configurations"] }}</h2>
-
+                    <h2>{{ lang.dashboard_global_configurations | default("Global Settings") }}</h2>
                     <div class="stat-card">
-                        <h3>{{ lang["dashboard-captcha-config"] }}</h3>
-                        <p>{{ lang["dashboard-captcha-config-desc"] }}</p>
-
-                        <form action="/apply_general_captcha" method="POST">
+                        <h3>{{ lang.dashboard_captcha_config | default("Global CAPTCHA Settings") }}</h3>
+                        <p>{{ lang.dashboard_captcha_config_desc | default("Enable or disable CAPTCHA requirement for posting on all boards.") }}</p>
+                        <form action="{{ url_for('auth.apply_general_captcha') }}" method="POST" class="global-settings-form">
                             <div class="action-buttons">
-                                <button type="submit" name="generalcaptcha_option" value="enable" class="btn btn-success">{{ lang["dashboard-captcha-config-enable"] }}</button>
-                                <button type="submit" name="generalcaptcha_option" value="disable" class="btn btn-danger">{{ lang["dashboard-captcha-config-disable"] }}</button>
+                                <button type="submit" name="generalcaptcha_option" value="enable" class="btn btn-success">{{ lang.dashboard_captcha_config_enable | default("Enable All") }}</button>
+                                <button type="submit" name="generalcaptcha_option" value="disable" class="btn btn-danger">{{ lang.dashboard_captcha_config_disable | default("Disable All") }}</button>
                             </div>
                         </form>
                     </div>
 
                     <div class="stat-card">
-                        <h3>Idioma do Site</h3>
-                        <form action="/change_general_lang" method="POST">
+                        <h3>{{ lang.dashboard_site_language | default("Site Default Language") }}</h3>
+                        <form action="{{ url_for('auth.change_general_lang') }}" method="POST" class="global-settings-form">
                             <select name="lang">
-                                <option value="pt-br">Português (Brasil)</option>
-                                <option value="en-us">English (US)</option>
-                                <option value="es">Español</option>
-                                <option value="jp">日本語</option>
+                                {# --- ПРЕДПОЛАГАЕМ, ЧТО all_languages_list ПЕРЕДАЕТСЯ ИЗ БЭКЕНДА --- #}
+                                {# all_languages_list должен быть списком словарей, например: [{'code': 'en-us', 'name': 'English (US)'}, ...] #}
+                                {# И lang.default_site_lang_code - текущий язык по умолчанию #}
+                                {% set current_default_lang = lang.default_site_lang_code | default('en-us') %}
+                                <option value="en-us" {% if current_default_lang == 'en-us' %}selected{% endif %}>English (US)</option>
+                                <option value="pt-br" {% if current_default_lang == 'pt-br' %}selected{% endif %}>Português (Brasil)</option>
+                                <option value="es" {% if current_default_lang == 'es' %}selected{% endif %}>Español</option>
+                                <option value="jp" {% if current_default_lang == 'jp' %}selected{% endif %}>日本語</option>
+                                <option value="ru" {% if current_default_lang == 'ru' %}selected{% endif %}>Русский</option>
                             </select>
-                            <button type="submit" class="btn btn-primary">Alterar Idioma</button>
+                            <button type="submit" class="btn btn-primary">{{ lang.dashboard_change_language | default("Change Language") }}</button>
                         </form>
                     </div>
                 </section>
-            {% endif %}
-        </div>
+            {% endif %} {# Конец Global Settings (только для владельца) #}
+        </main>
     </div>
+
+    <dialog id="banDialog" class="ban_post_popup">
+        <div class="dialog_header">
+            <h2>{{ lang.ban_user_title | default("Ban User") }}</h2>
+            <button type="button" class="close-dialog-btn" onclick="closeBanDialog()">×</button>
+        </div>
+        <form id="banForm" action="" method="post">
+            <input type="hidden" name="content_id" id="banContentId" value="">
+            <div class="form_section board_ban_selector" style="display: none;">
+                <h3>{{ lang.ban_which_board | default("Which board?") }}</h3>
+                <select name="ban_scope_board_uri" id="banScopeBoardUri">
+                    <option value="all_boards" selected>{{ lang.ban_all_boards | default("All boards (Global IP Ban)") }}</option>
+                </select>
+            </div>
+            <div class="form_section ban_reason">
+                <h3>{{ lang.ban_reason | default("Reason (optional):") }}</h3>
+                <input type="text" name="ban_reason" id="banReason" placeholder="{{ lang.ban_reason_placeholder | default("Enter reason for ban") }}">
+            </div>
+            <div class="form_section ban_times">
+                <h3>{{ lang.ban_duration | default("Duration:") }}</h3>
+                <ul>
+                    <li class="ban_time"><button name="ban_duration" value="3600" type="submit">1h</button></li>
+                    <li class="ban_time"><button name="ban_duration" value="21600" type="submit">6h</button></li>
+                    <li class="ban_time"><button name="ban_duration" value="86400" type="submit">1d</button></li>
+                    <li class="ban_time"><button name="ban_duration" value="259200" type="submit">3d</button></li>
+                    <li class="ban_time"><button name="ban_duration" value="604800" type="submit">7d</button></li>
+                    <li class="ban_time"><button name="ban_duration" value="2592000" type="submit">1m</button></li>
+                    <li class="ban_time"><button name="ban_duration" value="0" type="submit">{{ lang.ban_permanent | default("Permanent") }}</button></li>
+                </ul>
+            </div>
+        </form>
+    </dialog>
+
     {% include 'utils/footer.html' %}
-    <script src="/static/js/socket.js"></script>
+    <script src="{{ url_for('static', filename='js/socket.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sections = document.querySelectorAll('.main-content .mod-section');
+            const navLinks = document.querySelectorAll('.sidebar nav a');
+            const nav = document.querySelector('.sidebar nav');
+
+            function changeActiveLink() {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop - nav.offsetHeight - 20; // Учитываем высоту нав. панели
+                    if (pageYOffset >= sectionTop) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === '#' + current) {
+                        link.classList.add('active');
+                    }
+                });
+                // Если ни одна секция не активна (например, в самом верху), активируем первую
+                if (!current && navLinks.length > 0) {
+                     const firstLink = document.querySelector('.sidebar nav a[href="#overview"]');
+                     if (firstLink) firstLink.classList.add('active');
+                }
+            }
+            if (sections.length > 0 && navLinks.length > 0) {
+                window.addEventListener('scroll', changeActiveLink);
+                changeActiveLink(); // Инициализация при загрузке
+            }
+
+            // JavaScript для диалога бана
+            const banDialog = document.getElementById('banDialog');
+            const banForm = document.getElementById('banForm');
+            const banContentIdInput = document.getElementById('banContentId');
+
+            window.openBanDialog = function(contentId, currentBoardUri) { // Делаем функцию глобальной
+                if (banDialog && banForm && banContentIdInput) {
+                    banForm.action = "{{ url_for('auth.ban_user_generic') }}";
+                    banContentIdInput.value = contentId;
+                    const banReasonInput = document.getElementById('banReason');
+                    if (banReasonInput) banReasonInput.value = '';
+                    banDialog.showModal();
+                } else {
+                    console.error('Ban dialog elements not found!');
+                    alert('Error: Ban dialog could not be opened.');
+                }
+            }
+
+            window.closeBanDialog = function() { // Делаем функцию глобальной
+                if (banDialog) {
+                    banDialog.close();
+                }
+            }
+
+            if (banDialog) {
+                banDialog.addEventListener('click', function(event) {
+                    if (event.target === banDialog) {
+                        closeBanDialog();
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>

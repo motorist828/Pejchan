@@ -1,87 +1,136 @@
 <div class="posts" id="posts_board">
-    {% for post in posts %}
-    {% if post.board == board_id %}
-    {% if post.visible == 1 or 'visible' not in post %}
-    <div class="divisoria"></div>
-    <div class="post" post-role="operator" id="{{ post.post_id }}">
-        <div class="postInfo">
-            <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" name="65004" form="banDeleteForm">
-            &nbsp;<span class="nameBlock"><span class="name">{% if post.post_user == '' or post.post_user == 'Anonymous' %}Anon{% else %}{{ post.post_user | safe }} {% endif %}</span></span>&nbsp;
-            <span class="postDate">{{ post.post_date }}</span>&nbsp;<a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No.</a> <a class="postLink" href="/{{ board_id }}/thread/{{ post.post_id }}" class="postNumber">{{ post.post_id }}</a>
-                <a class="postLink" href="/{{ board_id }}/thread/{{ post.post_id }}">&nbsp; [{{ lang['thread-reply-button'] }}]</a>{% include 'utils/thread-moderation-options.html' %}
-        </div>
-        <div class="post_content_container">
-            <div class="post_files {% if post.post_images|length > 1 %}multiple_files{% endif %}">
-                {% for image in post.post_images %}
-                    <div class="post_image">
-                        <div class="post_image_info">
-                            <a class="image_url" href="/static/post_images/{{ image }}">
-                                {{ image }}
-                            </a>
-                        </div>
-                        <img draggable="false" class="post_img" 
-                                src="{{ url_for('static', filename='post_images/' ~ post.imagesthb[loop.index0]) }}"
-								href="/static/post_images/{{ image }}"
-                                alt="">
-                    </div>
-                {% endfor %}
-            </div>
-            <div class="post_content">
-                <pre>{% if post.post_content | length >= 500 %}{{ post.post_content[:450] | safe }}...<a class="toolong" href="/{{ board_id }}/thread/{{ post.post_id }}">Ver mais.</a>{% else %}{{ post.post_content | safe }}{% endif %}</pre>
-            </div>
-            <div class="replies">
-                {% set post_replies = replies|selectattr('post_id', 'equalto', post.post_id)|list %}
-                {% set last_4_replies = post_replies[-4:] %}
-                {% set hidden_replies_count = post_replies|length - 4 if post_replies|length > 4 else 0 %}
 
-                {% for reply in last_4_replies %}
-                <div class="reply" id="{{ reply.reply_id }}">
-                    <div class="reply-postInfo">
-                        <input id="togglemodoptions" type="checkbox" class="deletionCheckBox" name="{{ post.post_id }}" form="banDeleteForm">
-                        <span class="nameBlock"><span class="name">{% if not reply.post_user or reply.post_user == '' %}Anon{% else %}{{ reply.post_user | safe }}{% endif %}</span></span>
-                        <span class="postDate">{{ reply.post_date }}</span>&nbsp;<a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No.</a> <a class="postLink" href="/{{ board_id }}/thread/{{ post.post_id }}" >{{ reply.reply_id }}</a>{% include 'utils/reply-moderation-options.html' %}
-                    </div>
-                    <div class="post_content_container">
-                        {% if reply.get('images') or reply.get('image') %}
-                            <div class="reply_files {% if reply.get('images') and reply.images|length > 1 %}multiple_files{% endif %}">
-                                {% for image in reply.get('images', [reply.get('image', '')]) %}
+    {# Итерируемся по списку постов (тредов), переданному из view-функции #}
+    {% for post in posts %}
+
+        {# ---- УДАЛЕНЫ ЛИШНИЕ ПРОВЕРКИ ---- #}
+        {# 'post.board == board_id' не нужна, т.к. функция get_posts_for_board уже отфильтровала посты для этой доски #}
+        {# 'post.visible == 1' не нужна, т.к. get_posts_for_board уже исключила закрепленные/невидимые #}
+
+        <div class="divisoria"></div>
+        <div class="post" post-role="operator" id="{{ post.post_id }}"> {# Используем post_id для якоря #}
+            <div class="postInfo">
+                {# Уникальный ID и value для чекбокса #}
+                <input id="togglemodoptions_post_{{ post.post_id }}" type="checkbox" class="deletionCheckBox" value="{{ post.post_id }}" form="banDeleteForm">
+                 <span class="nameBlock"><span class="name">{% if not post.post_user or post.post_user == 'Anonymous' %}Anon{% else %}{{ post.post_user | safe }}{% endif %}</span></span> 
+                <span class="postDate" data-iso-date="{{ post.post_date }}">{{ post.date_display }}</span>&nbsp; 
+                <a href="/{{ board_id }}/thread/{{ post.post_id }}" class="postLink">No.</a> {# Ссылка на тред #}
+                <a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ post.post_id }}">{{ post.post_id }}</a> {# Ссылка для цитирования #}
+                <a class="postLink" href="/{{ board_id }}/thread/{{ post.post_id }}">  [{{ lang.get('thread-reply-button', 'Reply') }}]</a> {# Используем lang.get с fallback #}
+                {# Включаем опции модерации для треда #}
+                {% include 'utils/thread-moderation-options.html' ignore missing with context %}
+            </div>
+            <div class="post_content_container">
+
+                {# --- Отображение файлов поста (треда) --- #}
+                {% if post.post_images_list %}
+                <div class="post_files {% if post.post_images_list | length > 1 %}multiple_files{% endif %}">
+                    {% for image_filename in post.post_images_list %}
+                        {% set thumb_path = post.imagesthb_list[loop.index0] if post.imagesthb_list and loop.index0 < post.imagesthb_list | length else None %}
+                        {% set image_url = url_for('static', filename= 'post_images/' + image_filename) %}
+                        <div class="post_image">
+                            <div class="post_image_info">
+                                <a class="image_url" href="{{ image_url }}">
+                                    {{ image_filename }}
+                                </a>
+                            </div>
+                            {% if thumb_path %}
                                 
-								{% set thb_image = reply.imagesthb if (reply.imagesthb is string) else (reply.imagesthb[loop.index0] if (reply.imagesthb and loop.index0 < reply.imagesthb|length) else image) %}
-                                <div class="reply_image">
-                                        {% if image %}
-                                            <div class="reply_file">
-                                                <div class="reply_image_info">
-                                                    <a class="image_url" href="/static/reply_images/{{ image }}">
-                                                        {{ image }}
-                                                    </a>
-                                                </div>
+                                    <img draggable="false" class="post_img"
+                                         src="{{ url_for('static', filename=thumb_path) }}"
+                                         <a href="{{ image_url }}"> {# Делаем миниатюру ссылкой на оригинал #}
+                                </a>
+                            {% else %}
+                                <a href="{{ image_url }}">
+                                    <img draggable="false" class="post_img placeholder_img" src="{{ url_for('static', filename='placeholder.png') }}" alt="No thumbnail">
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+                {% endif %} {# Конец if post.post_images_list #}
+
+                <div class="post_content">
+                    {# Отображение контента с обрезкой и ссылкой "Ver mais" #}
+                    {# Используем original_content и striptags для безопасности #}
+                    {% set content_to_show = post.get('original_content', '') %}
+                    <pre>{% if content_to_show | length >= 500 %}{{ content_to_show[:450] | striptags }}...<a class="toolong" href="/{{ board_id }}/thread/{{ post.post_id }}">Ver mais.</a>{% else %}{{ content_to_show | striptags }}{% endif %}</pre>
+                    {# Если нужно показывать форматированный HTML:
+                    <pre>{% if post.post_content | length >= 500 %}{{ post.post_content[:450] | safe }}...<a class="toolong" href="/{{ board_id }}/thread/{{ post.post_id }}">Ver mais.</a>{% else %}{{ post.post_content | safe }}{% endif %}</pre>
+                    #}
+                </div>
+
+                {# --- Отображение последних ответов --- #}
+                <div class="replies">
+                    {# Фильтруем ответы для ТЕКУЩЕГО поста #}
+                    {# ВАЖНО: Убедитесь, что 'replies', переданный в шаблон, содержит ВСЕ ответы для ВСЕХ постов на странице #}
+                    {% set post_replies = replies | selectattr('post_id', 'equalto', post.post_id) | list %}
+                    {% set reply_limit = 4 %} {# Количество отображаемых последних ответов #}
+                    {% set last_replies = post_replies[-reply_limit:] %}
+                    {% set hidden_replies_count = (post_replies | length) - (last_replies | length) if (post_replies | length) > reply_limit else 0 %}
+
+                    {# Сообщение о скрытых ответах, если они есть #}
+                    {% if hidden_replies_count > 0 %}
+                    <div class="hidden-replies">
+                        <span>{{ hidden_replies_count }} {{ lang.get('hidden-replies', 'hidden replies.') }} </span>
+                    </div>
+                    {% endif %}
+
+                    {# Отображаем последние ответы #}
+                    {% for reply in last_replies %}
+                    <div class="reply" id="{{ reply.reply_id }}"> {# ID для якоря #}
+                        <div class="reply-postInfo">
+                            <input id="togglemodoptions_reply_{{ reply.reply_id }}" type="checkbox" class="deletionCheckBox" value="{{ reply.reply_id }}" form="banDeleteForm">
+                            <span class="nameBlock"><span class="name">{% if not reply.post_user or reply.post_user == 'Anonymous' %}Anon{% else %}{{ reply.post_user | safe }}{% endif %}</span></span>
+                            <span class="postDate" data-iso-date="{{ reply.post_date }}">{{ reply.date_display }}</span>&nbsp;
+                            <a href="/{{ board_id }}/thread/{{ post.post_id }}#{{ reply.reply_id }}" class="postLink">No.</a> {# Ссылка на тред + якорь ответа #}
+                            <a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ reply.reply_id }}">{{ reply.reply_id }}</a> {# ID для цитирования #}
+                            {# Включаем опции модерации для ответа #}
+                            {% include 'utils/reply-moderation-options.html' ignore missing with context %}
+                        </div>
+                        <div class="post_content_container"> {# Контейнер для контента ответа #}
+
+                            {# --- Отображение файлов ответа --- #}
+                            {% if reply.images_list %}
+                            <div class="reply_files {% if reply.images_list | length > 1 %}multiple_files{% endif %}">
+                                {% for image_filename in reply.images_list %}
+                                    {% set thumb_path = reply.imagesthb_list[loop.index0] if reply.imagesthb_list and loop.index0 < reply.imagesthb_list | length else None %}
+                                    {% set image_url = url_for('static', filename= 'reply_images/' + image_filename) %}
+                                    <div class="reply_image">
+                                        <div class="reply_image_info">
+                                            <a class="image_url" href="{{ image_url }}">
+                                                {{ image_filename }}
+                                            </a>
+                                        </div>
+                                        {% if thumb_path %}
                                             
-                                                    <img draggable="false" class="reply_img" 
-                                                        src="{{ url_for('static', filename='reply_images/' ~ thb_image) }}"
-														href="/static/reply_images/{{ image }}"
-                                                        alt="">
-                                                
-                                            </div>
+                                                <img draggable="false" class="reply_img"
+                                                     src="{{ url_for('static', filename=thumb_path) }}"
+                                                     <a href="{{ image_url }}">
+                                            </a>
+                                        {% else %}
+                                             <a href="{{ image_url }}">
+                                                <img draggable="false" class="reply_img placeholder_img" src="{{ url_for('static', filename='placeholder.png') }}" alt="No thumbnail">
+                                             </a>
                                         {% endif %}
-                                </div>
+                                    </div>
                                 {% endfor %}
                             </div>
-                        {% endif %}
-                        <div class="reply_content">
-                            <pre>{{ reply.content | safe }}</pre>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-                {% if hidden_replies_count > 0 %}
-                <div class="hidden-replies">
-                    <span>{{ hidden_replies_count }} {{ lang['hidden-replies'] }}</span>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    {% endif %}
-    {% endfor %}
-</div>
+                            {% endif %} {# Конец if reply.images_list #}
+
+                            <div class="reply_content">
+                                {# Отображаем форматированный контент ответа #}
+                                <pre>{{ reply.content | safe }}</pre> {# Осторожно с |safe #}
+                            </div>
+                        </div> {# Конец post_content_container ответа #}
+                    </div> {# Конец div.reply #}
+                    {% endfor %} {# Конец цикла по последним ответам #}
+					
+					
+					
+					
+                </div> {# Конец div.replies #}
+            </div> {# Конец post_content_container поста #}
+        </div> {# Конец div.post #}
+    {% endfor %} {# Конец цикла по постам #}
+</div> {# Конец div.posts #}

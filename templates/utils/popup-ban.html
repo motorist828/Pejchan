@@ -1,0 +1,74 @@
+<dialog id="banDialog" class="ban_post_popup popup-ban">
+    <div class="dialog_header">
+        <h2>Ban User</h2>
+        <button type="button" class="close-dialog-btn" onclick="closeBanDialog()">×</button>
+    </div>
+    <form id="banForm" action="" method="post">
+        <input type="hidden" name="content_id" id="banContentId" value="">
+
+        {# Скрытый блок выбора доски #}
+        <div class="form_section board_ban_selector" style="display: none;">
+            <h3>Which board?</h3>
+            <select name="ban_scope_board_uri" id="banScopeBoardUri">
+                <option value="all_boards" selected>All boards (Global IP Ban)</option>
+            </select>
+        </div>
+
+        <div class="form_section ban_reason"> {# Обернули в form_section #}
+            <h3>Reason (optional):</h3>
+            <input type="text" name="ban_reason" id="banReason" placeholder="Enter reason for ban">
+        </div>
+
+        <div class="form_section ban_times"> {# Обернули в form_section #}
+            <h3>Duration:</h3>
+            <ul>
+                <li class="ban_time"><button name="ban_duration" value="3600" type="submit">1h</button></li>
+                <li class="ban_time"><button name="ban_duration" value="21600" type="submit">6h</button></li>
+                <li class="ban_time"><button name="ban_duration" value="86400" type="submit">1d</button></li>
+                <li class="ban_time"><button name="ban_duration" value="259200" type="submit">3d</button></li>
+                <li class="ban_time"><button name="ban_duration" value="604800" type="submit">7d</button></li>
+                <li class="ban_time"><button name="ban_duration" value="2592000" type="submit">1m</button></li>
+                <li class="ban_time"><button name="ban_duration" value="0" type="submit">Permanent</button></li>
+            </ul>
+        </div>
+    </form>
+</dialog>
+
+<script>
+    const banDialog = document.getElementById('banDialog');
+    const banForm = document.getElementById('banForm');
+    const banContentIdInput = document.getElementById('banContentId');
+    // const banScopeBoardUriSelect = document.getElementById('banScopeBoardUri'); // Если используется выбор доски
+
+    function openBanDialog(contentId, currentBoardUri) {
+        if (banDialog && banForm && banContentIdInput) {
+            // Устанавливаем action формы (направляем на универсальный эндпоинт)
+            // Эндпоинт теперь не содержит ID в URL, ID будет в данных формы
+            banForm.action = "{{ url_for('auth.ban_user_generic') }}"; // Новый маршрут!
+            banContentIdInput.value = contentId;
+
+            // Если бы был выбор доски:
+            // banScopeBoardUriSelect.value = currentBoardUri; // Установить текущую доску по умолчанию
+            // или 'all_boards'
+
+            banDialog.showModal(); // Открываем стандартный HTML dialog
+        } else {
+            console.error('Ban dialog elements not found!');
+        }
+    }
+
+    function closeBanDialog() {
+        if (banDialog) {
+            banDialog.close(); // Закрываем стандартный HTML dialog
+        }
+    }
+
+    // Закрытие диалога по клику вне его (если это стандартный <dialog>)
+    if (banDialog) {
+        banDialog.addEventListener('click', function(event) {
+            if (event.target === banDialog) {
+                closeBanDialog();
+            }
+        });
+    }
+</script>
