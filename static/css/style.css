@@ -112,7 +112,7 @@ body {
 }
 
 pre {
-  font-size: 11.5pt;
+  font-size: 14pt;
 }
 
 .scrollbar-track {
@@ -801,6 +801,11 @@ input:focus, select:focus, textarea:focus {
     box-shadow: 0 0 0 2px rgba(var(--cor-primaria-rgb), 0.2);
 }
 
+#text {
+  font-size: 15px; /* Размер текста */
+  font-family: inherit;
+}
+
 
 .label, .rlabel {
   padding: 3px; /* Keep original padding */
@@ -1319,7 +1324,16 @@ img#post_video_thumbnail {
 }
 
 
+.catalog-section-title {
+  text-align: center;
+  color: var(--cor-texto);
+  margin-block-start: 0.3em;
+  margin-block-end: 0.5em;
+}
 
+.catalog-separator {
+    border-color: var(--cor-primaria);
+}
 
 
 .catalog-grid{
@@ -1329,7 +1343,7 @@ img#post_video_thumbnail {
   gap: 0em;
   align-items: center;
   justify-content: center;
-  padding-top: 2em;
+
   
 }
 
