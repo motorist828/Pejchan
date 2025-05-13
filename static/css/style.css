@@ -426,7 +426,7 @@ footer a:hover {
     gap: 1.0em;
     margin: 0;
     padding: 0.1em;
-    font-size: 7pt;
+    font-size: 9pt;
 }
 
 .board-links li {
@@ -456,7 +456,7 @@ footer a:hover {
   position: relative;
   transition: all 0.3s ease;
   text-decoration: none;
-  font-size: 10pt;
+  font-size: 14pt;
   padding: 0.2em 0.6em;
   margin: 0;
 }
@@ -670,8 +670,8 @@ fieldset legend {
   border-radius: var(--border-radius-sm); /* Use var */
   border-color: var(--cor-borda); /* Use var */
   border-width: 1px;
-  width: 9em; /* Keep original size */
-  height: 3.3em; /* Keep original size */
+  width: 14em; /* Keep original size */
+  height: 2.8em; /* Keep original size */
   text-align: center;
   color: var(--cor-secundaria);
   display: block;
@@ -693,6 +693,7 @@ fieldset legend {
   text-decoration: none;
   color: var(--cor-secundaria);
   transition: color 0.2s ease; /* For text color change on parent hover */
+  font-size: 12pt;
 }
 #togglePostFormLink:hover a {
     color: white; /* Ensure link text also changes */
@@ -887,6 +888,7 @@ input[type=submit]:hover {
   justify-content: center;
   padding: 0em 1em; /* Keep original padding */
   max-height: 2.3em; /* Keep original size */
+  margin-top: 0.5em;
 }
 
 .board-options ul {
@@ -904,7 +906,7 @@ input[type=submit]:hover {
 .board-options ul li a {
   text-decoration: none;
   color: var(--cor-secundaria);
-  font-size: 10pt; /* Keep original size */
+  font-size: 12pt; /* Keep original size */
   transition: all 0.3s ease;
   padding: 0.3em 0.6em; /* Add padding */
   border-radius: var(--border-radius-sm);
@@ -1084,8 +1086,9 @@ img#post_video_thumbnail {
 }
 
 .post_img{
-  max-width: 200px;
-  max-height: 200px;
+  min-height: 150px;
+  max-width: 250px;
+  max-height: 250px;
   object-fit: cover;
   min-width: 100px;
   border-radius: 4px;
@@ -1150,8 +1153,8 @@ img#post_video_thumbnail {
 
 .video-thumbnail{
   cursor: pointer;
-  max-width: 200px;
-  max-height: 200px;
+  max-width: 250px;
+  max-height: 250px;
   object-fit: cover;
   min-width: 200px;
 }
@@ -1303,10 +1306,10 @@ img#post_video_thumbnail {
 }
 
 .reply_img {
-  height: 180px;     /* Keep original size */
+  min-height: 150px;
   width: auto;       /* Keep original size */
-  max-width: 200px;  /* Keep original size */
-  object-fit: cover; 
+  max-width: 250px;  /* Keep original size */
+  max-height: 250px;
   cursor: pointer;
   flex: auto; /* Keep original flex */
   border-radius: var(--border-radius-sm); /* Use var */

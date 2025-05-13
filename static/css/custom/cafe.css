@@ -299,6 +299,10 @@ input, select, textarea {
     box-shadow: inset 0 1px #D2D8BB, 0 0 5px rgba(0, 0, 0, 0.125);
 }
 
+.reply_content {
+  color: var(--cor-borda-claro); /* Main text color */
+}
+
 .reply:hover {
     border-color: var(--cor-secundaria);
     background-color: rgba(var(--cor-fundo-claro-rgb, 39, 39, 42), 0.1);
