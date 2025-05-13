@@ -130,6 +130,11 @@ body {
   color: #ffffff;
 }
 
+.catalog-container .catalog-post{
+  background-color: #f1f9fe;
+}
+
+
 .last-posts {
     display: flex;
     flex-direction: column;
