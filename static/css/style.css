@@ -671,7 +671,7 @@ fieldset legend {
   border-color: var(--cor-borda); /* Use var */
   border-width: 1px;
   width: 14em; /* Keep original size */
-  height: 2.8em; /* Keep original size */
+  height: 3.4em; /* Keep original size */
   text-align: center;
   color: var(--cor-secundaria);
   display: block;
@@ -893,25 +893,31 @@ input[type=submit]:hover {
 
 .board-options ul {
   display: flex;
-  align-items: flex-start;
-  gap: 0.4em; /* Keep original gap */
-  padding: 0em; /* Keep original padding */
-  list-style: none; /* Remove bullets */
-}
-
-.board-options ul li {
+  width: 100%;
+  padding: 0;
   list-style: none;
 }
 
-.board-options ul li a {
+.board-option {
+  flex: 1; /* Равномерное распределение */
+  min-width: 8em; /* Важно для правильной работы flex */
+  margin: 0.25em;
+}
+
+.board-option a {
+  display: block;
+  text-align: center;
   text-decoration: none;
   color: var(--cor-secundaria);
-  font-size: 12pt; /* Keep original size */
+  font-size: 12pt;
   transition: all 0.3s ease;
-  padding: 0.3em 0.6em; /* Add padding */
+  padding: 0.3em 0.6em;
   border-radius: var(--border-radius-sm);
   border: 1px solid var(--cor-borda);
   background-color: var(--cor-fundo-claro);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip; /* Вместо ellipsis, чтобы не было многоточия */
 }
 
 .board-options ul li a:hover {
