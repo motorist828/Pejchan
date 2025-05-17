@@ -1,5 +1,3 @@
-# --- START OF FILE posts_bp.py ---
-
 from flask import current_app, Blueprint, render_template, redirect, request, flash, session, url_for
 # Use the updated database and moderation modules
 from database_modules import database_module, moderation_module, formatting
@@ -404,6 +402,3 @@ def new_post():
             try: return redirect(url_for('boards.replies', board_name=board_id, thread_id=posted_id, _anchor=f'p{posted_id}')) # ИЗМЕНЕНО replies на thread_page
             except Exception as e: logger.warning(f"URL build error: {e}. Fallback."); return redirect(url_for('boards.board_page', board_uri=board_id))
     else: return redirect(request.referrer or url_for('boards.board_page', board_uri=board_id))
-
-
-# --- END OF FILE posts_bp.py ---

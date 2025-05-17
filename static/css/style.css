@@ -169,6 +169,18 @@ pre {
   color: #AF0A0F;
 }
 
+.strong {
+  font-weight: bold; 
+}
+
+.italic {
+  font-style: italic;
+}
+
+.s {
+    text-decoration: line-through;
+}
+
 .toolong{
   color: var(--cor-secundaria);
 }
@@ -2024,4 +2036,96 @@ dialog::backdrop {
 .ban_post_popup .remove_all_ip_posts {
   /* Если этот блок не используется, его можно удалить из HTML или скрыть */
   display: none;
+}
+
+
+.refmap {
+    font-size: 0.8em;
+    margin-top: 5px;
+    padding-top: 5px;
+    border-top: 1px dashed var(--cor-borda-claro);
+    clear: both; /* Если были float элементы */
+}
+.refmap-label {
+    color: var(--cor-terciaria);
+    margin-right: 5px;
+}
+.refmap-link {
+    margin-right: 5px;
+    /* Стили как у .postLink или .quote-reply */
+    color: var(--cor-quote);
+    text-decoration: none;
+}
+.refmap-link:hover {
+    text-decoration: underline;
+}
+
+/* Стили для всплывающего окна предпросмотра */
+.post-preview-popup {
+    display: none; /* Скрыто по умолчанию */
+    position: absolute;
+    z-index: 1050; /* Выше большинства элементов */
+    background-color: var(--cor-fundo-claro);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-dark-lg); /* Более выраженная тень */
+    padding: 12px;
+    width: auto; /* Ширина по контенту */
+    max-width: 550px; /* Максимальная ширина */
+    max-height: 450px; /* Максимальная высота */
+    overflow-y: auto;
+    font-size: 0.9em; /* Чуть меньше основного текста */
+    line-height: 1.5;
+}
+
+/* Стили для контента внутри превью (упрощенные) */
+.post-preview-popup .postInfo-preview,
+.post-preview-popup .reply-postInfo-preview { /* Если будете так называть класс для инфо ответа */
+    font-size: 0.9em;
+    color: var(--cor-terciaria);
+    border-bottom: 1px solid var(--cor-borda-claro);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+}
+.post-preview-popup .postInfo-preview .name,
+.post-preview-popup .reply-postInfo-preview .name {
+    color: var(--cor-texto-claro); /* Имя можно выделить */
+    font-weight: bold;
+}
+
+.post-preview-popup .post_files-preview,
+.post-preview-popup .reply_files-preview {
+    margin-bottom: 8px;
+    display: flex; /* Располагаем миниатюры в ряд */
+    flex-wrap: wrap;
+    gap: 5px;
+}
+.post-preview-popup .post_files-preview img,
+.post-preview-popup .reply_files-preview img {
+    max-width: 150px; /* Меньше миниатюры в превью */
+    max-height: 150px;
+    object-fit: cover;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--cor-borda-claro);
+}
+
+.post-preview-popup .postContent-preview pre,
+.post-preview-popup .replyContent-preview pre { /* Если будете так называть класс для контента ответа */
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: var(--cor-texto);
+    margin: 0;
+    padding: 0;
+    font-size: 1em; /* Относительно .post-preview-popup */
+    max-height: 150px; /* Ограничение высоты текста в превью */
+    overflow-y: auto;
+}
+
+.operator-quote-marker {
+  color: #f59e0b;  
+}
+
+.post.highlighted-quote-target,
+.reply.highlighted-quote-target {
+  background-color: rgba(100, 180, 220, 0.2) !important;
 }

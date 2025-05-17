@@ -76,7 +76,17 @@ def format_comment(comment):
     comment = ''.join(formatted_comment)
 
     # Substituir links
-    comment = re.sub(r'\[([^\]]+)\]\((https?://[^\s]+(?:\S)*)\)', r'<a class="hyper-link" href="\2">\1</a>', comment)
+    comment = re.sub(
+        r'\[([^\]]+)\]\((https?://[^\s]+)\)',
+        r'<a class="hyper-link" href="\2" target="_blank" rel="noopener noreferrer">\1</a>',
+        comment
+    )
+    comment = re.sub(
+        r'(?<![("\'>])(https?://[^\s]+)(?![^<]*>)',
+        r'<a class="hyper-link" href="\1" target="_blank" rel="noopener noreferrer">\1</a>',
+        comment
+    )
+
 
     # Manipulação de '((('
     parts = comment.split('(((')
@@ -87,6 +97,12 @@ def format_comment(comment):
         else:
             parts[index] = f'((({parts[index]}'
     comment = ''.join(parts)
+
+    comment = comment.replace('[b]', '<span class="strong">').replace('[/b]', '</span>')  
+
+    comment = comment.replace('[i]', '<span class="italic">').replace('[/i]', '</span>') 
+
+    comment = comment.replace('[s]', '<span class="s">').replace('[/s]', '</span>') 
 
     # Manipulação de '=='
     parts = comment.split('==')
