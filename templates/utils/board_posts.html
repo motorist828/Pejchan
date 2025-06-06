@@ -35,11 +35,11 @@
                                 </a>
                             </div>
                             {% if thumb_path %}
-                                
-                                    <img draggable="false" class="post_img"
-                                         src="{{ url_for('static', filename=thumb_path) }}"
-                                         <a href="{{ image_url }}"> {# Делаем миниатюру ссылкой на оригинал #}
-                                </a>
+                            <a href="{{ image_url }}">
+                                 <img draggable="false" class="post_img"
+                                      src="{{ url_for('static', filename=thumb_path) }}"
+                                      href="{{ image_url }}"> 
+                            </a>
                             {% else %}
                                 <a href="{{ image_url }}">
                                     <img draggable="false" class="post_img placeholder_img" src="{{ url_for('static', filename='placeholder.png') }}" alt="No thumbnail">
@@ -59,6 +59,7 @@
                     <pre>{% if post.post_content | length >= 500 %}{{ post.post_content[:450] | safe }}...<a class="toolong" href="/{{ board_id }}/thread/{{ post.post_id }}">Ver mais.</a>{% else %}{{ post.post_content | safe }}{% endif %}</pre>
                     #}
                 </div>
+
 
                 {# --- Отображение последних ответов --- #}
                 <div class="replies">
@@ -82,7 +83,7 @@
                         <div class="reply-postInfo">
                             <input id="togglemodoptions_reply_{{ reply.reply_id }}" type="checkbox" class="deletionCheckBox" value="{{ reply.reply_id }}" form="banDeleteForm">
                             <span class="nameBlock"><span class="name">{% if not reply.post_user or reply.post_user == 'Anonymous' %}Anon{% else %}{{ reply.post_user | safe }}{% endif %}</span></span>
-                            <span class="postDate" data-iso-date="{{ reply.post_date }}">{{ reply.date_display }}</span>&nbsp;
+                            <span class="postDate" data-iso-date="{{ reply.post_date }}">{{ reply.date_display }}</span>
                             <a href="/{{ board_id }}/thread/{{ post.post_id }}#{{ reply.reply_id }}" class="postLink">No.</a> {# Ссылка на тред + якорь ответа #}
                             <a class="postLink js-quote-link" href="javascript:void(0);" data-post-id="{{ reply.reply_id }}">{{ reply.reply_id }}</a> {# ID для цитирования #}
                             {# Включаем опции модерации для ответа #}
@@ -104,9 +105,10 @@
                                         </div>
                                         {% if thumb_path %}
                                             
+                                            <a href="{{ image_url }}">
                                                 <img draggable="false" class="reply_img"
                                                      src="{{ url_for('static', filename=thumb_path) }}"
-                                                     <a href="{{ image_url }}">
+                                                     href="{{ image_url }}"> 
                                             </a>
                                         {% else %}
                                              <a href="{{ image_url }}">
@@ -122,6 +124,8 @@
                                 {# Отображаем форматированный контент ответа #}
                                 <pre>{{ reply.content | safe }}</pre> {# Осторожно с |safe #}
                             </div>
+														
+							
                         </div> {# Конец post_content_container ответа #}
                     </div> {# Конец div.reply #}
                     {% endfor %} {# Конец цикла по последним ответам #}

@@ -29,11 +29,11 @@
                                     </a>
                                 </div>
                                 {% if thumb_path %}
-                                  
-                                        <img draggable="false" class="post_img"
-                                             src="{{ url_for('static', filename=thumb_path) }}"
-                                             href="{{ image_url }}">
-                                    </a>
+                            		<a href="{{ image_url }}">
+                                 		<img draggable="false" class="post_img"
+                                      		src="{{ url_for('static', filename=thumb_path) }}"
+                                      		href="{{ image_url }}"> 
+                            		</a>
                                 {% else %}
                                      <a href="{{ image_url }}">
                                         <img draggable="false" class="post_img placeholder_img" src="{{ url_for('static', filename='placeholder.png') }}" alt="No thumbnail">

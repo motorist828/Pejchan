@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const MAX_FILES = 4;
     const MAX_TOTAL_SIZE_MB = 20;
     const MAX_TOTAL_SIZE_BYTES = MAX_TOTAL_SIZE_MB * 1024 * 1024;
-    const EDGE_MARGIN = 10; // <<<--- ДОБАВЛЕНО: Отступ от края экрана в пикселях
+    const EDGE_MARGIN = 30; // <<<--- ДОБАВЛЕНО: Отступ от края экрана в пикселях
 
     // --- Проверка наличия необходимых элементов ---
     if (!fileInput) console.warn("[Init] Элемент input#file не найден. Функционал загрузки файлов не будет работать.");
