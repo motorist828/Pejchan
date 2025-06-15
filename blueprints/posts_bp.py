@@ -68,7 +68,7 @@ class PostHandler:
         self.user_ip = user_ip
         self.post_mode = post_mode # "post" or "reply"
         raw_name = post_name.strip() if post_name else "Anonymous"
-        self.post_name = raw_name
+        self.post_name = formatting.escape_html_post_info(raw_name)
         self.board_id = board_id
         self.original_content = comment
         self.comment = formatting.format_comment(comment)

@@ -1,4 +1,9 @@
 import re
+import html
+
+def escape_html(s):
+    # Scape html to remove any XSS.
+    return html.escape(s).replace('&gt;', '>').replace('&lt;', '<')
 
 def filter_xss(comment):
     # Regular expression to search html tags.
